@@ -10,12 +10,10 @@ import (
 
 // EnergyPlacementStrategy randomly places the container into the cluster.
 type EnergyPlacementStrategy struct {
-	r *rand.Rand
 }
 
 // Initialize a RandomPlacementStrategy.
 func (p *EnergyPlacementStrategy) Initialize() error {
-	p.r = rand.New(rand.NewSource(time.Now().UTC().UnixNano()))
 	return nil
 }
 
@@ -32,3 +30,15 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	}
 	return nodes, nil
 }
+
+func (argumentos, 1 ou 2 significando como devera estar ordenado) getHostsListsLEE_DEE (retorno) {
+		
+}
+
+func  (argumentos) getHostsListsEED_DEE (retorno) {
+
+}
+
+
+
+
