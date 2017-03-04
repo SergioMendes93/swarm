@@ -9,6 +9,7 @@ import (
 )
 
 func create(c *cli.Context) {
+	
 	if len(c.Args()) != 0 {
 		log.Fatalf("the `create` command takes no arguments. See '%s create --help'.", c.App.Name)
 	}
@@ -18,5 +19,6 @@ func create(c *cli.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("BUGA")
 	fmt.Println(token)
 }
