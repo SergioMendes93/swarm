@@ -19,6 +19,5 @@ func create(c *cli.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("BUGA")
 	fmt.Println(token)
 }
