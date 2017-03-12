@@ -20,12 +20,15 @@ func (f *AffinityFilter) Name() string {
 
 // Filter is exported
 func (f *AffinityFilter) Filter(config *cluster.ContainerConfig, nodes []*node.Node, soft bool) ([]*node.Node, error) {
+	fmt.Println("ENTROU AQUI")
 	affinities, err := parseExprs(config.Affinities())
 	if err != nil {
 		return nil, err
 	}
 
 	for _, affinity := range affinities {
+	fmt.Println("ENTROU AQUI2")
+
 		if !soft && affinity.isSoft {
 			continue
 		}
@@ -33,6 +36,10 @@ func (f *AffinityFilter) Filter(config *cluster.ContainerConfig, nodes []*node.N
 
 		candidates := []*node.Node{}
 		for _, node := range nodes {
+			fmt.Println(affinity.Key)
+			fmt.Println(affinity.Value)
+	fmt.Println("ENTROU AQUI3")
+
 			switch affinity.key {
 			case "container":
 				containers := []string{}

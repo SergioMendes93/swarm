@@ -3,6 +3,7 @@ package strategy
 import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
+	"github.com/docker/swarm/scheduler/filter"
 	
 	"encoding/json"
 	"fmt"
@@ -41,6 +42,22 @@ func (p *EnergyPlacementStrategy) Name() string {
 
 // RankAndSort randomly sorts the list of nodes.
 func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error) {
+
+	affinities, err := filter.ParseExprs(config.Affinities())
+	fmt.Println(affinities)	
+
+	for _, affinity := range affinities {
+		fmt.Println("energy")
+		fmt.Println(affinity.Key)
+		if affinity.Key == "requestclass" {
+			fmt.Println("Energy.go")
+			fmt.Println(affinity.Value)
+		}
+	}	
+
+	if err != nil {
+		return nil, err
+	}
 	
 	url := "http://192.168.1.154:12345/host/list/1&1"
    // var jsonStr = []byte(`{"firstname":"lapis"}`)
