@@ -43,7 +43,13 @@ func (s *Scheduler) SelectNodesForContainer(nodes []*node.Node, config *cluster.
 }
 
 func (s *Scheduler) selectNodesForContainer(nodes []*node.Node, config *cluster.ContainerConfig, soft bool) ([]*node.Node, error) {
+
+	if s.Strategy() == "energy" {
+		return s.strategy.RankAndSort(config, nodes)
+	}  
+
 	accepted, err := filter.ApplyFilters(s.filters, config, nodes, soft)
+
 	if err != nil {
 		return nil, err
 	}

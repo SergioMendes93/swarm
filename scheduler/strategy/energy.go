@@ -3,20 +3,26 @@ package strategy
 import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
+	
+	"encoding/json"
+	"fmt"
+	"net/http"
 )
+//	"io/ioutil"
 
-
-type hostInfo struct {
-
-	HostID string
-	TotalResourcesUtilization int
-	CPU_Utilization int
-	MemoryUtilization int
-	HostClass int
-	AllocatedResources int
-	TotalHostResources int
-	OverbookingFactor int
+type Host struct {
+        HostID      string              `json:"hostid,omitempty"`
+        WorkerNodesID []string          `json:"workernodesid,omitempty"`
+        HostClass   string              `json:"hostclass,omitempty"`
+        Region      string              `json:"region,omitempty"`
+        TotalResourcesUtilization int   `json:"totalresouces,omitempty"`
+        CPU_Utilization int             `json:"cpu,omitempty"`
+        MemoryUtilization int           `json:"memory,omitempty"`
+        AllocatedResources int          `json:"resoucesallocated,omitempty"`
+        TotalHostResources int          `json:"totalresources,omitempty"`
+        OverbookingFactor int           `json:"overbookingfactor,omitempty"`
 }
+
 
 
 // EnergyPlacementStrategy randomly places the container into the cluster.
@@ -36,6 +42,29 @@ func (p *EnergyPlacementStrategy) Name() string {
 // RankAndSort randomly sorts the list of nodes.
 func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error) {
 	
+	url := "http://192.168.1.154:12345/host/list/1&1"
+   // var jsonStr = []byte(`{"firstname":"lapis"}`)
+//    req, err := http.NewRequest("GET", url, bytes.NewBuffer(jsonStr))
+	req, err := http.NewRequest("GET", url, nil)
+  
+	req.Header.Set("X-Custom-Header", "myvalue")
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+
+	var hosts []*Host 
+	_ = json.NewDecoder(resp.Body).Decode(&hosts)	
+
+//    body,_ := ioutil.ReadAll(resp.Body)
+
+  //  fmt.Println("response Body:", string(body))
+	fmt.Println(hosts)
+	/*
 	output := make([]*node.Node,1)
 	//listHostsLEE_DEE := getHostsListsLEE_DEE()
 	
@@ -57,11 +86,11 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 	output[0] = kill()
 	if len(output) > 0 
-		return output, nil
+		return output, nil */
 
-	return nil, nil //can't be scheduled
+	return nodes, nil //can't be scheduled
 }
-
+/*
 func cut() {
 
 	for _, host := range listHostsLEE_DEE {
