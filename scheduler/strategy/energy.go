@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 )
-//	"io/ioutil"
 
 type Host struct {
         HostID      string              `json:"hostid,omitempty"`
@@ -45,13 +44,11 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 	affinities, err := filter.ParseExprs(config.Affinities())
 	fmt.Println(affinities)	
+	requestClass := ""
 
 	for _, affinity := range affinities {
-		fmt.Println("energy")
-		fmt.Println(affinity.Key)
 		if affinity.Key == "requestclass" {
-			fmt.Println("Energy.go")
-			fmt.Println(affinity.Value)
+			requestClass = affinity.Value
 		}
 	}	
 
@@ -59,7 +56,8 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		return nil, err
 	}
 	
-	url := "http://192.168.1.154:12345/host/list/1&1"
+	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info
+	url := "http://192.168.1.154:12345/host/list/"+requestClass+"&1"
    // var jsonStr = []byte(`{"firstname":"lapis"}`)
 //    req, err := http.NewRequest("GET", url, bytes.NewBuffer(jsonStr))
 	req, err := http.NewRequest("GET", url, nil)
@@ -74,27 +72,23 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
     }
     defer resp.Body.Close()
 
-	var hosts []*Host 
-	_ = json.NewDecoder(resp.Body).Decode(&hosts)	
+	var listHostsLEE_DEE []*Host 
+	_ = json.NewDecoder(resp.Body).Decode(&listHostsLEE_DEE)	
 
-//    body,_ := ioutil.ReadAll(resp.Body)
-
-  //  fmt.Println("response Body:", string(body))
-	fmt.Println(hosts)
-	/*
-	output := make([]*node.Node,1)
-	//listHostsLEE_DEE := getHostsListsLEE_DEE()
+	fmt.Println(listHostsLEE_DEE)
 	
-	//listHostsLEE_DEE é suposto ser um slice para o for abaixo funcionar
-	for _, host := range listHostsLEE_DEE {
-		//ver se o host tem recursos que chegue para acomodar o request, se fit entao faço return
-		if fits {
+	//output := make([]*node.Node,1)
+	
+	for i := 0; i < len(listHostsLEE_DEE); i++ {
+		//check if host has enough resources to accomodate the request, if it does, return it
+		/*if fits {
 			output[0] = host
 			return output, nil
-		}
+		}*/
+		fmt.Println("Host: " + listHostsLEE_DEE[i].HostID + " Region: " + listHostsLEE_DEE[i].Region)
 			
 	}
-
+/*
 	//obtemos a nova listHostsLEE_DEE, desta vez ordenada de forma diferente
 	output[0], request  =  cut()
 	if len(output) > 0 { //if > 0 then it means that we have a host that it can be scheduled	
