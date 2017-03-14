@@ -3,7 +3,6 @@ package node
 import (
 	"errors"
 	"net/http"
-	"fmt"
 	"github.com/docker/swarm/cluster"
 )
 

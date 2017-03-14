@@ -4,10 +4,10 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/scheduler/filter"
-	
+
+	"net/http"	
 	"encoding/json"
 	"fmt"
-	"net/http"
 )
 
 type Host struct {
@@ -18,7 +18,9 @@ type Host struct {
         TotalResourcesUtilization int   `json:"totalresouces,omitempty"`
         CPU_Utilization int             `json:"cpu,omitempty"`
         MemoryUtilization int           `json:"memory,omitempty"`
-        AllocatedResources int          `json:"resoucesallocated,omitempty"`
+		AvailableCPUs int64				`json:"availablecpus,omitempty"`
+        AvailableMemory int64			`json:"availablememory,omitempty"`
+		AllocatedResources int          `json:"resoucesallocated,omitempty"`
         TotalHostResources int          `json:"totalresources,omitempty"`
         OverbookingFactor int           `json:"overbookingfactor,omitempty"`
 }
@@ -55,15 +57,14 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	if err != nil {
 		return nil, err
 	}
-	
-	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info
+//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info
 	url := "http://192.168.1.154:12345/host/list/"+requestClass+"&1"
    // var jsonStr = []byte(`{"firstname":"lapis"}`)
 //    req, err := http.NewRequest("GET", url, bytes.NewBuffer(jsonStr))
 	req, err := http.NewRequest("GET", url, nil)
   
 	req.Header.Set("X-Custom-Header", "myvalue")
-    req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/json")
 
     client := &http.Client{}
     resp, err := client.Do(req)
@@ -75,18 +76,26 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	var listHostsLEE_DEE []*Host 
 	_ = json.NewDecoder(resp.Body).Decode(&listHostsLEE_DEE)	
 
+
 	fmt.Println(listHostsLEE_DEE)
 	
-	//output := make([]*node.Node,1)
+	output := make([]*node.Node,0)
 	
 	for i := 0; i < len(listHostsLEE_DEE); i++ {
 		//check if host has enough resources to accomodate the request, if it does, return it
-		/*if fits {
+		host := listHostsLEE_DEE[i]
+		if host.AvailableMemory > config.HostConfig.Memory && host.AvailableCPUs > config.HostConfig.CPUShares {
 			//obter lista de workers do host e escolher um, randomly?
-			output[0] = host
-			return output, nil
-		}*/
-		fmt.Println("Host: " + listHostsLEE_DEE[i].HostID + " Region: " + listHostsLEE_DEE[i].Region)
+			for j := 0; j < len(nodes); j++ {			
+				if nodes[j].Name == "manager1"{
+					continue
+				}
+				if nodes[j].ID == host.WorkerNodesID[0] {
+					output = append(output, nodes[j])
+					return output, nil
+				}
+			}
+		}
 			
 	}
 /*
