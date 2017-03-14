@@ -2,7 +2,8 @@ package node
 
 import (
 	"errors"
-
+	"net/http"
+	"fmt"
 	"github.com/docker/swarm/cluster"
 )
 
@@ -26,6 +27,24 @@ type Node struct {
 
 // NewNode creates a node from an engine.
 func NewNode(e *cluster.Engine) *Node {
+	//TODO: Para identificar o host à qual este worker pertence usar as labels
+	//TODO: isto vai ser mudado de manager1 para manager
+	if e.Name != "manager1" {
+		url := "http://192.168.1.154:12345/host/addworker/1&"+e.ID
+		req, err := http.NewRequest("GET", url, nil)
+		req.Header.Set("X-Custom-Header", "myvalue")
+		req.Header.Set("Content-Type", "application/json")
+		
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		
+		if err != nil {
+			panic(err)
+		}
+
+		defer resp.Body.Close()
+	}
+	
 	return &Node{
 		ID:              e.ID,
 		IP:              e.IP,

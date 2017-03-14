@@ -82,6 +82,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	for i := 0; i < len(listHostsLEE_DEE); i++ {
 		//check if host has enough resources to accomodate the request, if it does, return it
 		/*if fits {
+			//obter lista de workers do host e escolher um, randomly?
 			output[0] = host
 			return output, nil
 		}*/
