@@ -59,7 +59,7 @@ func NewNode(e *cluster.Engine) *Node {
 		defer resp.Body.Close()
 	}*/
 	if e.Name != "manager1" {
-		url := "http://192.168.1.154:12345/host/addworker/1&"+e.ID
+		url := "http://192.168.1.154:12345/host/addworker/4&"+e.ID
 		req, err := http.NewRequest("GET", url, nil)
 		req.Header.Set("X-Custom-Header", "myvalue")
 		req.Header.Set("Content-Type", "application/json")
