@@ -13,6 +13,7 @@ import (
 type Host struct {
         HostID      string              `json:"hostid,omitempty"`
         WorkerNodesID []string          `json:"workernodesid,omitempty"`
+		WorkesNodes []*node.Node		`json:"workernodes,omitempty"`
         HostClass   string              `json:"hostclass,omitempty"`
         Region      string              `json:"region,omitempty"`
         TotalResourcesUtilization int   `json:"totalresouces,omitempty"`
@@ -57,26 +58,10 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	if err != nil {
 		return nil, err
 	}
-//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info
-	url := "http://192.168.1.154:12345/host/list/"+requestClass+"&1"
-   // var jsonStr = []byte(`{"firstname":"lapis"}`)
-//    req, err := http.NewRequest("GET", url, bytes.NewBuffer(jsonStr))
-	req, err := http.NewRequest("GET", url, nil)
-  
-	req.Header.Set("X-Custom-Header", "myvalue")
-	req.Header.Set("Content-Type", "application/json")
 
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        panic(err)
-    }
-    defer resp.Body.Close()
-
-	var listHostsLEE_DEE []*Host 
-	_ = json.NewDecoder(resp.Body).Decode(&listHostsLEE_DEE)	
-
-
+	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info
+	listHostsLEE_DEE := GetLists("http://192.168.1.154:12345/host/list/"+requestClass+"&1")
+	
 	fmt.Println(listHostsLEE_DEE)
 	
 	output := make([]*node.Node,0)
@@ -87,10 +72,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		if host.AvailableMemory > config.HostConfig.Memory && host.AvailableCPUs > config.HostConfig.CPUShares {
 			//obter lista de workers do host e escolher um, randomly?
 			for j := 0; j < len(nodes); j++ {			
-				if nodes[j].Name == "manager1"{
-					continue
-				}
-				if nodes[j].ID == host.WorkerNodesID[0] {
+				if nodes[j].ID == host.WorkerNodesID[0] && nodes[j].Name != "manager1" {
 					output = append(output, nodes[j])
 					return output, nil
 				}
@@ -110,6 +92,25 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		return output, nil */
 
 	return nodes, nil //can't be scheduled
+}
+
+func GetLists(url string) ([]*Host) {
+	req, err := http.NewRequest("GET", url, nil)
+  
+	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+
+	var listHosts []*Host 
+	_ = json.NewDecoder(resp.Body).Decode(&listHosts)	
+	
+	return listHosts
 }
 /*
 func cut() {

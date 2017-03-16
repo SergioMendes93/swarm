@@ -28,6 +28,36 @@ type Node struct {
 func NewNode(e *cluster.Engine) *Node {
 	//TODO: Para identificar o host à qual este worker pertence usar as labels
 	//TODO: isto vai ser mudado de manager1 para manager
+	//TODO: Isto só pode ser enviado uma vez, atualmente envia varias vezes
+/*	if e.Name != "manager1" {
+		url := "http://192.168.1.154:12345/host/addworker/1"
+	
+		var jsonStr = []byte(`{	"ID": "e.ID",
+		"IP":             "e.IP",
+		"Addr":           "e.Addr",
+		"Name":           "e.Name",
+		"Labels":          "e.Labels",
+		"Containers":      "e.Containers()",
+		"Images":          "e.Images()",
+		"UsedMemory":      "e.UsedMemory()",
+		"UsedCpus":        "e.UsedCpus()",
+		"TotalMemory":     "e.TotalMemory()",
+		"TotalCpus":       "e.TotalCpus()",
+		"HealthIndicator": "e.HealthIndicator()"}`)
+
+		req, err := http.NewRequest("GET", url, nil)
+		req.Header.Set("X-Custom-Header", "myvalue")
+		req.Header.Set("Content-Type", "application/json")
+		
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		
+		if err != nil {
+			panic(err)
+		}
+
+		defer resp.Body.Close()
+	}*/
 	if e.Name != "manager1" {
 		url := "http://192.168.1.154:12345/host/addworker/1&"+e.ID
 		req, err := http.NewRequest("GET", url, nil)
@@ -43,7 +73,6 @@ func NewNode(e *cluster.Engine) *Node {
 
 		defer resp.Body.Close()
 	}
-	
 	return &Node{
 		ID:              e.ID,
 		IP:              e.IP,
