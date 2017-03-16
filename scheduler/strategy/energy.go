@@ -52,7 +52,7 @@ func (p *EnergyPlacementStrategy) Name() string {
 }
 
 // RankAndSort randomly sorts the list of nodes.
-func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error) {
+func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string) {
 
 	affinities, err := filter.ParseExprs(config.Affinities())
 	fmt.Println(affinities)	
@@ -65,7 +65,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	}	
 
 	if err != nil {
-		return nil, err
+		return nil, err, "0"
 	}
 
 	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info.. //endereço do manager e port do host registry
@@ -82,7 +82,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 			for j := 0; j < len(nodes); j++ {			
 				if nodes[j].ID == host.WorkerNodesID[0] && nodes[j].Name != "manager1" {
 					output = append(output, nodes[j])
-					return output, nil
+					return output, nil, "0"
 				}
 			}
 		}
@@ -91,16 +91,16 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	//obtemos a nova listHostsLEE_DEE, desta vez ordenada de forma diferente	
 	listHostsLEE_DEE = GetHosts("http://192.168.1.154:12345/host/list/"+requestClass+"&2")
 	
-	host, allocable :=  cut(listHostsLEE_DEE, requestClass, config)
+	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable == true { //if true then it means that we have a host that it can be scheduled	
-		return findNode(host, nodes), nil
+		return findNode(host, nodes), nil, cut
 	}
 /*
 	output[0] = kill()
 	if len(output) > 0 
 		return output, nil 
 */
-	return nodes, nil //can't be scheduled
+	return nodes, nil, "0" //can't be scheduled
 }
 
 func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
@@ -115,7 +115,7 @@ func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
 	return output
 }
 
-func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool) {
+func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool, string) {
 		
 	for i := 0; i < len(listHostsLEE_DEE); i++ {
 		cutList := make([]Task,0)
@@ -128,7 +128,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			listTasks = append(listTasks, GetTasks("http://192.168.1.154:1234/task/higher/" + requestClass)...)
 		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
 			//TODO atualizar o request(talvez no config?)
-			return host, true
+			return host, true, requestClass
 		} else if requestClass != "1" {
 			listTasks = append(listTasks, GetTasks("http://192.168.1.154:1234/task/equalhigher/" + requestClass)...)
 		}
@@ -140,13 +140,13 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			cutList = append(cutList, task)
 			/*
 			if fitsAfterCut() {
-				cutRequests()
+				cutRequests() //inclui o incoming request
 				return host, nil
 			}*/
 		}
-		return host, true
+		return host, true, "0"
 	}
-	return listHostsLEE_DEE[0], false
+	return listHostsLEE_DEE[0], false, "0"
 }
 
 func afterCutRequestFits(requestClass string, host *Host, config *cluster.ContainerConfig) (bool) {

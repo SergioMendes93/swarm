@@ -26,12 +26,12 @@ func (p *RandomPlacementStrategy) Name() string {
 }
 
 // RankAndSort randomly sorts the list of nodes.
-func (p *RandomPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error) {
+func (p *RandomPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string) {
 	fmt.Println("BUGA1")
 	for i := len(nodes) - 1; i > 0; i-- {
 		j := p.r.Intn(i + 1)
 		nodes[i], nodes[j] = nodes[j], nodes[i]
 	}
 	
-	return nodes, nil
+	return nodes, nil, "0"
 }
