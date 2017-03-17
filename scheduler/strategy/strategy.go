@@ -20,7 +20,7 @@ type PlacementStrategy interface {
 	// on the best fit given the container configuration.  It returns a sorted
 	// list of nodes (based on their ranks) or an error if there is no
 	// available node on which to schedule the container.
-	RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string)
+	RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, bool)
 }
 
 var (

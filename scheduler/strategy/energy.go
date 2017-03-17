@@ -30,7 +30,8 @@ type Host struct {
 type Task struct {
     TaskID string               `json:"taskid,omitempty"`
 	TaskClass string			`json:"taskclass,omitempty"`
-    AllocatedResources string   `json:"allocatedresources,omitempty"`
+	CPU float64					`json:"cpu,omitempty"`
+	Memory float64				`json:"memory,omitempty"`
     TaskType string             `json:"tasktype,omitempty"`
     CutReceived string          `json:"cutreceived,omitempty"`
 }
@@ -52,7 +53,7 @@ func (p *EnergyPlacementStrategy) Name() string {
 }
 
 // RankAndSort randomly sorts the list of nodes.
-func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string) {
+func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, bool) {
 
 	affinities, err := filter.ParseExprs(config.Affinities())
 	fmt.Println(affinities)	
@@ -65,7 +66,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	}	
 
 	if err != nil {
-		return nil, err, "0"
+		return nil, err, "0", false
 	}
 
 	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info.. //endereço do manager e port do host registry
@@ -82,7 +83,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 			for j := 0; j < len(nodes); j++ {			
 				if nodes[j].ID == host.WorkerNodesID[0] && nodes[j].Name != "manager1" {
 					output = append(output, nodes[j])
-					return output, nil, "0"
+					return output, nil, requestClass, false
 				}
 			}
 		}
@@ -93,14 +94,14 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	
 	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable == true { //if true then it means that we have a host that it can be scheduled	
-		return findNode(host, nodes), nil, cut
+		return findNode(host, nodes), nil, cut, true
 	}
 /*
 	output[0] = kill()
 	if len(output) > 0 
 		return output, nil 
 */
-	return nodes, nil, "0" //can't be scheduled
+	return nodes, nil, "0", false //can't be scheduled
 }
 
 func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
@@ -127,60 +128,67 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			//listTasks = append(listTasks, GetTasks("http://" + host.HostIP + ":1234/task/higher/" + requestClass)
 			listTasks = append(listTasks, GetTasks("http://192.168.1.154:1234/task/higher/" + requestClass)...)
 		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
-			//TODO atualizar o request(talvez no config?)
-			return host, true, requestClass
+			return host, true, requestClass	//requestClass indicates the cut received, performed at /cluster/swarm/cluster.go
 		} else if requestClass != "1" {
 			listTasks = append(listTasks, GetTasks("http://192.168.1.154:1234/task/equalhigher/" + requestClass)...)
 		}
 		
+		newCPU := 0.0
+		newMemory := 0.0
+		if requestClass != "1" {
+			newMemory,newCPU = applyCut(requestClass, config)
+		} 
+	
 		for _, task := range listTasks {
 			if task.TaskClass == "1" {
 				break
 			}
 			cutList = append(cutList, task)
-			/*
-			if fitsAfterCut() {
-				cutRequests() //inclui o incoming request
-				return host, nil
-			}*/
+			
+			if fitAfterCuts(requestClass, host, newMemory, newCPU, cutList) {
+			//	cutRequests() //inclui o incoming request
+				fmt.Println("TRUE TRUE")
+				return host, true, requestClass
+			}
 		}
-		return host, true, "0"
+		return host, true, requestClass 
 	}
-	return listHostsLEE_DEE[0], false, "0"
+	return listHostsLEE_DEE[0], false, requestClass
 }
 
-func afterCutRequestFits(requestClass string, host *Host, config *cluster.ContainerConfig) (bool) {
+//this function checks if after cutting the tasks and incoming request the request fits on this host
+func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, cutList []Task)(bool) {
+	return true	
+}
+
+//por enquanto esta float mas depois mudar para int
+func applyCut(requestClass string, config *cluster.ContainerConfig) (float64, float64){
 	
 	switch requestClass {
 		case "2":
 			newMemory := float64(config.HostConfig.Memory) * 0.2
 			newCPU := float64(config.HostConfig.CPUShares) * 0.2
-			if float64(host.AvailableMemory) > newMemory && float64(host.AvailableCPUs) > newCPU {
-				return true
-			} else {
-				return false
-			}
-			break
+			return newMemory, newCPU
 		case "3":
 			newMemory := float64(config.HostConfig.Memory) * 0.3
 			newCPU := float64(config.HostConfig.CPUShares) * 0.3
-			if float64(host.AvailableMemory) > newMemory && float64(host.AvailableCPUs) > newCPU {
-				return true
-			} else {
-				return false
-			}
-
-			break
+			return newMemory, newCPU
 		case "4":
 			newMemory := float64(config.HostConfig.Memory) * 0.4
 			newCPU := float64(config.HostConfig.CPUShares) * 0.4
-			if float64(host.AvailableMemory) > newMemory && float64(host.AvailableCPUs) > newCPU {
-				return true
-			} else {
-				return false
-			}
+			return newMemory, newCPU
+	}
+	return 0.0,0.0
+}
 
-			break
+func afterCutRequestFits(requestClass string, host *Host, config *cluster.ContainerConfig) (bool) {
+
+	newMemory, newCPU := applyCut(requestClass, config)
+	
+	if float64(host.AvailableMemory) > newMemory && float64(host.AvailableCPUs) > newCPU {
+		return true
+	} else {
+		return false
 	}
 	return false
 }

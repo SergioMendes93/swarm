@@ -10,6 +10,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"net/http"
+	"bytes"
+	"strconv"
+	"encoding/json"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -200,7 +204,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		config.AddAffinity("image==" + config.Image)
 	}
 
-	nodes, err, cut := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodes, err, requestClass, cut := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 
 	if withImageAffinity {
 		config.RemoveAffinity("image==" + config.Image)
@@ -226,16 +230,13 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	c.scheduler.Unlock()
 	
 	//if this condition is true then we must apply a cut to the request in order to fit it 
-	if cut != "0" {
-		switch cut {
+	if cut {
+		switch requestClass {
 			case "2":
-				fmt.Println("CUTCUT_2")
 				break
 			case "3":
-				fmt.Println("CUTCUT_3")
 				break
 			case "4":
-				fmt.Println("CUTCUT_4")
 				break
 		}
 	}
@@ -251,6 +252,29 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		}
 		log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).Debugf("Scheduling container %s to ", containerFlag)
 	}
+
+	//Update Task Registry with the task that was just created
+	url := "http://192.168.1.154:1234/task/"+requestClass
+	
+	fmt.Println("Container criado")
+	fmt.Println(container.ID)
+	values := map[string]string{"TaskID":container.ID, "TaskClass":requestClass,"CPU": strconv.FormatInt(config.HostConfig.CPUShares,10),
+									"Memory": strconv.FormatInt(config.HostConfig.Memory,10), "TaskType": "nadaporagora", "CutReceived": "nada"}  
+	//var jsonStr = []byte(`{	"TaskID": "container.ID","TaskClass":requestClass, 
+	//	"CPU":"config.HostConfig.CPUShares", "Memory": "config.HostConfig.Memory", "TaskType": "nadaporagora", "CutReceived": "nada_por_agora"}`)
+	jsonStr, _ := json.Marshal(values)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("Content-Type", "application/json")
+		
+	client := &http.Client{}
+	resp, err := client.Do(req)
+		
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
@@ -519,7 +543,7 @@ func (c *Cluster) CreateNetwork(name string, request *types.NetworkCreate) (resp
 		config = cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:node==" + parts[0]}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{})
 	}
 
-	nodes, err, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 	if err != nil {
 		return nil, err
 	}
@@ -578,7 +602,7 @@ func (c *Cluster) CreateVolume(request *volume.VolumesCreateBody) (*types.Volume
 		wg.Wait()
 	} else {
 		config := cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:node==" + parts[0]}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{})
-		nodes, err, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+		nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 		if err != nil {
 			return nil, err
 		}
@@ -935,7 +959,7 @@ func (c *Cluster) Info() [][2]string {
 
 // RANDOMENGINE returns a random engine.
 func (c *Cluster) RANDOMENGINE() (*cluster.Engine, error) {
-	nodes, err, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), &cluster.ContainerConfig{})
+	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), &cluster.ContainerConfig{})
 	if err != nil {
 		return nil, err
 	}
@@ -963,7 +987,7 @@ func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuil
 		containertypes.HostConfig{Resources: containertypes.Resources{CPUShares: buildImage.CPUShares, Memory: buildImage.Memory}},
 		networktypes.NetworkingConfig{})
 	buildImage.BuildArgs = convertKVStringsToMap(config.Env)
-	nodes, err, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 	c.scheduler.Unlock()
 	if err != nil {
 		return err
