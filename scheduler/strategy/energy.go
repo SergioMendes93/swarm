@@ -124,6 +124,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 
 		host := listHostsLEE_DEE[i]		
 
+		
 		if host.HostClass >= requestClass && requestClass != "4" {
 			//listTasks = append(listTasks, GetTasks("http://" + host.HostIP + ":1234/task/higher/" + requestClass)
 			listTasks = append(listTasks, GetTasks("http://192.168.1.154:1234/task/higher/" + requestClass)...)
@@ -146,18 +147,64 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			cutList = append(cutList, task)
 			
 			if fitAfterCuts(requestClass, host, newMemory, newCPU, cutList) {
-			//	cutRequests() //inclui o incoming request
-				fmt.Println("TRUE TRUE")
+				cutRequests(cutList) 
 				return host, true, requestClass
 			}
 		}
-		return host, true, requestClass 
+		//return host, false, requestClass 
 	}
 	return listHostsLEE_DEE[0], false, requestClass
 }
 
+func cutRequests(cutList []Task) {
+
+	cmd := "docker"
+	
+	for _, task := cutList {
+		newCPU := task.CPU * 0.2
+		newMemory := task.Memory * 0.2
+		
+		args := []string{"update", "-m", strconv.FormatFloat(newMemory, 'f', -1 ,64), "-c", strconv.FormatFloat(newCPU, 'f', -1, 64), task.TaskID}
+		if err := exec.Command(cmd, args...).Run(); err != nil {
+			fmt.Println("Error using docker update")
+		}
+	}
+}
+
 //this function checks if after cutting the tasks and incoming request the request fits on this host
 func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, cutList []Task)(bool) {
+	
+	cpuReduction := 0.0
+	memoryReduction := 0.0
+	
+	for _, task := range cutList {
+		switch task.TaskClass {
+			case "2":
+				cpuReduction += task.CPU * 0.2
+				memoryReduction += task.Memory * 0.2
+				break
+			case "3":
+				cpuReduction += task.CPU * 0.2
+				memoryReduction += task.Memory * 0.2
+				break
+			case "4":
+				cpuReduction += task.CPU * 0.2
+				memoryReduction += task.Memory * 0.2
+				break
+		}
+	}
+
+	//after cutting the tasks, the host will have the following memory and cpu
+	hostMemory := host.AvailableMemory - memoryReduction
+	hostCPU := host.AvailableCPUs - cpuReduction
+	
+	//lets see if after those cuts the request will now fit
+	if hostMemory > memory && hostCPU > cpu {
+		return true
+	} else {
+		return false
+	}
+	
 	return true	
 }
 
