@@ -782,6 +782,20 @@ func (e *Engine) refreshContainer(ID string, full bool) (*Container, error) {
 		e.Lock()
 		delete(e.containers, ID)
 		e.Unlock()
+		
+		fmt.Println("Removing " + ID)		
+
+		req, err := http.NewRequest("GET", "http://192.168.1.154:1234/task/remove/"+ID, nil)
+  
+		req.Header.Set("X-Custom-Header", "myvalue")
+		req.Header.Set("Content-Type", "application/json")
+
+    	client := &http.Client{}
+    	resp, err := client.Do(req)
+    	if err != nil {
+        	panic(err)
+    	}
+		defer resp.Body.Close()
 
 		return nil, nil
 	}
@@ -1022,7 +1036,6 @@ func (e *Engine) RemoveContainer(container *Container, force, volumes bool) erro
 	if err != nil {
 		return err
 	}
-
 	// Remove the container from the state. Eventually, the state refresh loop
 	// will rewrite this.
 	e.Lock()
@@ -1335,6 +1348,7 @@ func (e *Engine) removeContainer(container *Container) error {
 	if _, ok := e.containers[container.ID]; !ok {
 		return errors.New("container not found")
 	}
+
 	delete(e.containers, container.ID)
 	return nil
 }
