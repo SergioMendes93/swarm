@@ -256,10 +256,10 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	//Update Task Registry with the task that was just created
 	url := "http://192.168.1.154:1234/task/"+requestClass
 	
-	fmt.Println("Container criado")
-	fmt.Println(container.ID)
-	values := map[string]string{"TaskID":container.ID, "TaskClass":requestClass,"CPU": strconv.FormatInt(config.HostConfig.CPUShares,10),
-									"Memory": strconv.FormatInt(config.HostConfig.Memory,10), "TaskType": "nadaporagora", "CutReceived": "nada"}  
+	taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
+	taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
+	values := map[string]string{"TaskID":container.ID, "TaskClass":requestClass,"CPU": taskCPU,
+									"Memory": taskMemory, "TaskType": "nadaporagora", "CutReceived": "nada"}  
 	//var jsonStr = []byte(`{	"TaskID": "container.ID","TaskClass":requestClass, 
 	//	"CPU":"config.HostConfig.CPUShares", "Memory": "config.HostConfig.Memory", "TaskType": "nadaporagora", "CutReceived": "nada_por_agora"}`)
 	jsonStr, _ := json.Marshal(values)

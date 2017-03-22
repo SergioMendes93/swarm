@@ -7,6 +7,7 @@ import (
 
 	"net/http"	
 	"encoding/json"
+	"strconv"
 	"fmt"
 )
 
@@ -30,8 +31,8 @@ type Host struct {
 type Task struct {
     TaskID string               `json:"taskid,omitempty"`
 	TaskClass string			`json:"taskclass,omitempty"`
-	CPU float64					`json:"cpu,omitempty"`
-	Memory float64				`json:"memory,omitempty"`
+	CPU string					`json:"cpu,omitempty"`
+	Memory string				`json:"memory,omitempty"`
     TaskType string             `json:"tasktype,omitempty"`
     CutReceived string          `json:"cutreceived,omitempty"`
 }
@@ -101,7 +102,8 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	if len(output) > 0 
 		return output, nil 
 */
-	return nodes, nil, "0", false //can't be scheduled
+	fmt.Println("Aqui")
+	return nodes, nil, cut, false //can't be scheduled
 }
 
 func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
@@ -128,14 +130,15 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		if host.HostClass >= requestClass && requestClass != "4" {
 			//listTasks = append(listTasks, GetTasks("http://" + host.HostIP + ":1234/task/higher/" + requestClass)
 			listTasks = append(listTasks, GetTasks("http://192.168.1.154:1234/task/higher/" + requestClass)...)
-		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
-			return host, true, requestClass	//requestClass indicates the cut received, performed at /cluster/swarm/cluster.go
+		//} //else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
+		//	return host, true, requestClass	//requestClass indicates the cut received, performed at /cluster/swarm/cluster.go
 		} else if requestClass != "1" {
 			listTasks = append(listTasks, GetTasks("http://192.168.1.154:1234/task/equalhigher/" + requestClass)...)
 		}
 		
 		newCPU := 0.0
 		newMemory := 0.0
+		
 		if requestClass != "1" {
 			newMemory,newCPU = applyCut(requestClass, config)
 		} 
@@ -147,7 +150,8 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			cutList = append(cutList, task)
 			
 			if fitAfterCuts(requestClass, host, newMemory, newCPU, cutList) {
-				cutRequests(cutList) 
+				cutRequests(cutList)
+				fmt.Println("Cut done") 
 				return host, true, requestClass
 			}
 		}
@@ -158,17 +162,42 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 
 func cutRequests(cutList []Task) {
 
-	cmd := "docker"
 	
-	for _, task := cutList {
-		newCPU := task.CPU * 0.2
-		newMemory := task.Memory * 0.2
-		
-		args := []string{"update", "-m", strconv.FormatFloat(newMemory, 'f', -1 ,64), "-c", strconv.FormatFloat(newCPU, 'f', -1, 64), task.TaskID}
-		if err := exec.Command(cmd, args...).Run(); err != nil {
-			fmt.Println("Error using docker update")
+	for _, task := range cutList {
+		newCPU, err := strconv.ParseFloat(task.CPU, 64) 
+		newMemory, err := strconv.ParseFloat(task.Memory, 64) 
+
+		newCPU *= 0.2
+		newMemory *= 0.2
+
+		if err != nil {
+			fmt.Println(err)
 		}
+		cpu := strconv.FormatFloat(newCPU, 'f', -1, 64)
+		memory := strconv.FormatFloat(newMemory, 'f', -1, 64)
+		go UpdateTask(task.TaskClass, cpu, memory, task.TaskID, true)
+		go UpdateTask(task.TaskClass, cpu, memory, task.TaskID, false)
 	}
+}
+
+func UpdateTask (taskClass string, newCPU string, newMemory string, taskID string, target bool) {
+	var req *http.Request
+	var err error
+	//contact task registry
+	if target {
+		req, err = http.NewRequest("GET", "http://192.168.1.154:1234/task/updatetask/"+taskClass+"&"+newCPU+"&"+newMemory+"&"+taskID, nil)
+  	} else { //host registry
+		req, err = http.NewRequest("GET", "http://192.168.1.154:12345/host/updatetask/"+taskID+"&"+newCPU+"&"+newMemory, nil)
+	}
+    req.Header.Set("X-Custom-Header", "myvalue")
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
 }
 
 //this function checks if after cutting the tasks and incoming request the request fits on this host
@@ -180,23 +209,29 @@ func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, 
 	for _, task := range cutList {
 		switch task.TaskClass {
 			case "2":
-				cpuReduction += task.CPU * 0.2
-				memoryReduction += task.Memory * 0.2
+				taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
+				taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
+				cpuReduction += taskCPU * 0.2
+				memoryReduction +=  taskMemory * 0.2
 				break
 			case "3":
-				cpuReduction += task.CPU * 0.2
-				memoryReduction += task.Memory * 0.2
+				taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
+				taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
+				cpuReduction += taskCPU * 0.2
+				memoryReduction +=  taskMemory * 0.2
 				break
 			case "4":
-				cpuReduction += task.CPU * 0.2
-				memoryReduction += task.Memory * 0.2
+				taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
+				taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
+				cpuReduction += taskCPU * 0.2
+				memoryReduction +=  taskMemory * 0.2
 				break
 		}
 	}
 
 	//after cutting the tasks, the host will have the following memory and cpu
-	hostMemory := host.AvailableMemory - memoryReduction
-	hostCPU := host.AvailableCPUs - cpuReduction
+	hostMemory := float64(host.AvailableMemory) - memoryReduction
+	hostCPU := float64(host.AvailableCPUs) - cpuReduction
 	
 	//lets see if after those cuts the request will now fit
 	if hostMemory > memory && hostCPU > cpu {
