@@ -31,6 +31,7 @@ type Host struct {
 type Task struct {
     TaskID string               `json:"taskid,omitempty"`
 	TaskClass string			`json:"taskclass,omitempty"`
+	Image string				`json:"image,omitempty"`
 	CPU string					`json:"cpu,omitempty"`
 	Memory string				`json:"memory,omitempty"`
     TaskType string             `json:"tasktype,omitempty"`
@@ -107,57 +108,64 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		return findNode(host,nodes), nil, requestClass, false
 	}
 
-	return nodes, nil, cut, false //can't be scheduled
+	return nodes, nil, requestClass, false
+//	return nil, nil, requestClass, false //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
 }
 
 
 func kill(listHostsEED_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool) {
 	for i := 0 ; i < len(listHostsEED_DEE); i++ {
 		possibleKillList := make([]Task, 0)
-		
+		host := listHostsEED_DEE[i] 
+
 		//if requestClass == 4 && request.Type == Job
 		//STAND BY POR ENQUANTO
-		if requestClass == 4 {
-			possibleKillList = append(possibleKillList, GetTasks("http://192.168.1.154:1234/task/class4)...)
+		if requestClass == "4" {
+			possibleKillList = append(possibleKillList, GetTasks("http://192.168.1.154:1234/task/class4")...)
 
-		} else if requestClass == 4 {
-			return nil
+		} else if requestClass == "4" {
+			return nil, false
 		} else {
 			possibleKillList = append(possibleKillList, GetTasks("http://192.168.1.154:1234/task/higher/" + requestClass)...)
 		}
 
-		killList = make([]Task, 0)
+		killList := make([]Task, 0)
 		for _, task := range possibleKillList {
 			
 //			if requestClass == 4 && request.Type == Service {
-			if requestClass == 4 {
+			if requestClass == "4" {
 				killList = append(killList, task)
-			} else if request.Class != 4 {
+			} else if requestClass != "4" {
 				killList = append(killList, task)
 			}
 
-			if requestFitsAfterKills(killList, config) {
+			if requestFitsAfterKills(killList, host, config) {
 				go killTasks(killList)
 				go reschedule(killList)
-				return host
+				return host, true
 			}
 		}
-
 	}
+	fmt.Println("Nao killou")
+	return listHostsEED_DEE[0], true //em definitivo sera nil,false
 }
 
-func reschedule(killList []Task {
+func reschedule(killList []Task) {
 //Provavelmente vai ser igual aos cuts, mando para o host registry e este cria-o com o docker-machine, outra opção é mandar para o web server
+	for _, task := range killList {
+		go UpdateTask("http://192.168.1.154:12345/host/reschedule/"+task.CPU+"&"+task.Memory+"&"+task.TaskClass+"&"+task.Image)
+	}
 }
 
 func killTasks(killList []Task) {
-	for _, task := range cutList {
-		go UpdateTasks("http://192.168.1.154:12345/host/killtask/"+task.TaskID)
-		go UpdateTasks("http://192.168.1.154:1234/task/remove/"+task.TaskID)
+	fmt.Println("A killar")
+	for _, task := range killList {
+		go UpdateTask("http://192.168.1.154:12345/host/killtask/"+task.TaskID)
+		go UpdateTask("http://192.168.1.154:1234/task/remove/"+task.TaskID)
 	}
 }
 
-func requestFitsAfterKills(killList []Task, config config *cluster.ContainerConfig) (bool) {
+func requestFitsAfterKills(killList []Task, host *Host, config *cluster.ContainerConfig) (bool) {
 	cpuReduction := 0.0
 	memoryReduction := 0.0
 	
@@ -189,7 +197,7 @@ func requestFitsAfterKills(killList []Task, config config *cluster.ContainerConf
 	hostCPU := float64(host.AvailableCPUs) - cpuReduction
 	
 	//lets see if after those kill the request will now fit
-	if hostMemory > memory && hostCPU > cpu {
+	if hostMemory > float64(config.HostConfig.Memory) && hostCPU > float64(config.HostConfig.CPUShares) {
 		return true
 	} else {
 		return false

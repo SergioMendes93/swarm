@@ -258,9 +258,11 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	
 	taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 	taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
-	values := map[string]string{"TaskID":container.ID, "TaskClass":requestClass,"CPU": taskCPU,
+	fmt.Println("Image")
+	fmt.Println(config.Image)
+	values := map[string]string{"TaskID":container.ID, "TaskClass":requestClass,"CPU": taskCPU, "Image": config.Image,
 									"Memory": taskMemory, "TaskType": "nadaporagora", "CutReceived": "nada"}  
-	//var jsonStr = []byte(`{	"TaskID": "container.ID","TaskClass":requestClass, 
+	//var jsonStr = []byte(`{	"TaskID": "container.ID","TaskClass":requestClass,"Image": 
 	//	"CPU":"config.HostConfig.CPUShares", "Memory": "config.HostConfig.Memory", "TaskType": "nadaporagora", "CutReceived": "nada_por_agora"}`)
 	jsonStr, _ := json.Marshal(values)
 
