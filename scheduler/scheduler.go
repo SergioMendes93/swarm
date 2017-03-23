@@ -34,16 +34,16 @@ func New(strategy strategy.PlacementStrategy, filters []filter.Filter) *Schedule
 // SelectNodesForContainer will return a list of nodes where the container can
 // be scheduled, sorted by order or preference.
 //The string refers to if request should receive cut or not, 0 == no cut, 2 == class 2 cut, etc
-func (s *Scheduler) SelectNodesForContainer(nodes []*node.Node, config *cluster.ContainerConfig) ([]*node.Node, error, string, bool) {
-	candidates, err, requestClass, cut := s.selectNodesForContainer(nodes, config, true)
+func (s *Scheduler) SelectNodesForContainer(nodes []*node.Node, config *cluster.ContainerConfig) ([]*node.Node, error, string, string, bool) {
+	candidates, err, requestClass, requestType, cut := s.selectNodesForContainer(nodes, config, true)
 
 	if err != nil {
-		candidates, err, requestClass, cut = s.selectNodesForContainer(nodes, config, false)
+		candidates, err, requestClass, requestType, cut = s.selectNodesForContainer(nodes, config, false)
 	}
-	return candidates, err, requestClass, cut
+	return candidates, err, requestClass, requestType, cut
 }
 
-func (s *Scheduler) selectNodesForContainer(nodes []*node.Node, config *cluster.ContainerConfig, soft bool) ([]*node.Node, error, string, bool) {
+func (s *Scheduler) selectNodesForContainer(nodes []*node.Node, config *cluster.ContainerConfig, soft bool) ([]*node.Node, error, string, string, bool) {
 
 	if s.Strategy() == "energy" {
 		return s.strategy.RankAndSort(config, nodes)
@@ -52,11 +52,11 @@ func (s *Scheduler) selectNodesForContainer(nodes []*node.Node, config *cluster.
 	accepted, err := filter.ApplyFilters(s.filters, config, nodes, soft)
 
 	if err != nil {
-		return nil, err,"0", false
+		return nil, err,"0", "", false
 	}
 
 	if len(accepted) == 0 {
-		return nil, errNoNodeAvailable, "0", false
+		return nil, errNoNodeAvailable, "0", "", false
 	}
 
 	return s.strategy.RankAndSort(config, accepted)

@@ -55,20 +55,25 @@ func (p *EnergyPlacementStrategy) Name() string {
 }
 
 // RankAndSort randomly sorts the list of nodes.
-func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, bool) {
+func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, bool) {
 
 	affinities, err := filter.ParseExprs(config.Affinities())
 	fmt.Println(affinities)	
 	requestClass := ""
+	requestType := ""
 
 	for _, affinity := range affinities {
 		if affinity.Key == "requestclass" {
 			requestClass = affinity.Value
+			continue
+		}
+		if affinity.Key == "requesttype" {
+			requestType = affinity.Value
 		}
 	}	
 
 	if err != nil {
-		return nil, err, "0", false
+		return nil, err, "0", requestType, false
 	}
 
 	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info.. //endereço do manager e port do host registry
@@ -99,28 +104,27 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		return findNode(host, nodes), nil, cut, true
 	}
 */
+	return nodes, nil, requestClass, requestType, false
 
 	listHostsEED_DEE := GetHosts("http://192.168.1.154:12345/host/listkill/"+requestClass)
 
-	host, allocable := kill(listHostsEED_DEE, requestClass, config)
+	host, allocable := kill(listHostsEED_DEE, requestClass, requestType, config)
 	
 	if allocable {
-		return findNode(host,nodes), nil, requestClass, false
+		return findNode(host,nodes), nil, requestClass, requestType,  false
 	}
 
-	return nodes, nil, requestClass, false
-//	return nil, nil, requestClass, false //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
+	return nodes, nil, requestClass, requestType, false
+//	return nil, nil, requestClass, requestType, false //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
 }
 
 
-func kill(listHostsEED_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool) {
+func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, config *cluster.ContainerConfig) (*Host, bool) {
 	for i := 0 ; i < len(listHostsEED_DEE); i++ {
 		possibleKillList := make([]Task, 0)
 		host := listHostsEED_DEE[i] 
 
-		//if requestClass == 4 && request.Type == Job
-		//STAND BY POR ENQUANTO
-		if requestClass == "4" {
+		if requestClass == "4" && requestType == "job"{
 			possibleKillList = append(possibleKillList, GetTasks("http://192.168.1.154:1234/task/class4")...)
 
 		} else if requestClass == "4" {
@@ -132,8 +136,7 @@ func kill(listHostsEED_DEE []*Host, requestClass string, config *cluster.Contain
 		killList := make([]Task, 0)
 		for _, task := range possibleKillList {
 			
-//			if requestClass == 4 && request.Type == Service {
-			if requestClass == "4" {
+			if task.TaskClass == "4" && task.TaskType == "service" {
 				killList = append(killList, task)
 			} else if requestClass != "4" {
 				killList = append(killList, task)
@@ -146,7 +149,6 @@ func kill(listHostsEED_DEE []*Host, requestClass string, config *cluster.Contain
 			}
 		}
 	}
-	fmt.Println("Nao killou")
 	return listHostsEED_DEE[0], true //em definitivo sera nil,false
 }
 
@@ -158,7 +160,6 @@ func reschedule(killList []Task) {
 }
 
 func killTasks(killList []Task) {
-	fmt.Println("A killar")
 	for _, task := range killList {
 		go UpdateTask("http://192.168.1.154:12345/host/killtask/"+task.TaskID)
 		go UpdateTask("http://192.168.1.154:1234/task/remove/"+task.TaskID)

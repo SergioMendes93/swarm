@@ -204,7 +204,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		config.AddAffinity("image==" + config.Image)
 	}
 
-	nodes, err, requestClass, cut := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodes, err, requestClass, requestType, cut := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 
 	if withImageAffinity {
 		config.RemoveAffinity("image==" + config.Image)
@@ -258,10 +258,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	
 	taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 	taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
-	fmt.Println("Image")
-	fmt.Println(config.Image)
 	values := map[string]string{"TaskID":container.ID, "TaskClass":requestClass,"CPU": taskCPU, "Image": config.Image,
-									"Memory": taskMemory, "TaskType": "nadaporagora", "CutReceived": "nada"}  
+									"Memory": taskMemory, "TaskType": requestType, "CutReceived": "nada"}  
 	//var jsonStr = []byte(`{	"TaskID": "container.ID","TaskClass":requestClass,"Image": 
 	//	"CPU":"config.HostConfig.CPUShares", "Memory": "config.HostConfig.Memory", "TaskType": "nadaporagora", "CutReceived": "nada_por_agora"}`)
 	jsonStr, _ := json.Marshal(values)
@@ -545,7 +543,7 @@ func (c *Cluster) CreateNetwork(name string, request *types.NetworkCreate) (resp
 		config = cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:node==" + parts[0]}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{})
 	}
 
-	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +602,7 @@ func (c *Cluster) CreateVolume(request *volume.VolumesCreateBody) (*types.Volume
 		wg.Wait()
 	} else {
 		config := cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:node==" + parts[0]}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{})
-		nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+		nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 		if err != nil {
 			return nil, err
 		}
@@ -961,7 +959,7 @@ func (c *Cluster) Info() [][2]string {
 
 // RANDOMENGINE returns a random engine.
 func (c *Cluster) RANDOMENGINE() (*cluster.Engine, error) {
-	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), &cluster.ContainerConfig{})
+	nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), &cluster.ContainerConfig{})
 	if err != nil {
 		return nil, err
 	}
@@ -989,7 +987,7 @@ func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuil
 		containertypes.HostConfig{Resources: containertypes.Resources{CPUShares: buildImage.CPUShares, Memory: buildImage.Memory}},
 		networktypes.NetworkingConfig{})
 	buildImage.BuildArgs = convertKVStringsToMap(config.Env)
-	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 	c.scheduler.Unlock()
 	if err != nil {
 		return err

@@ -274,7 +274,7 @@ func (c *Cluster) CreateNetwork(name string, request *types.NetworkCreate) (*typ
 	}
 
 	c.scheduler.Lock()
-	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodes, err, _, _,_ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 	c.scheduler.Unlock()
 	if err != nil {
 		return nil, err
@@ -526,7 +526,7 @@ func (c *Cluster) LaunchTask(t *task.Task) bool {
 	c.scheduler.Lock()
 	//change to explicit lock defer c.scheduler.Unlock()
 
-	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), t.GetConfig())
+	nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), t.GetConfig())
 	if err != nil {
 		c.scheduler.Unlock()
 		return false
@@ -640,7 +640,7 @@ func (c *Cluster) RANDOMENGINE() (*cluster.Engine, error) {
 	c.RLock()
 	defer c.RUnlock()
 
-	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), &cluster.ContainerConfig{})
+	nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), &cluster.ContainerConfig{})
 	if err != nil {
 		return nil, err
 	}
@@ -661,7 +661,7 @@ func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuil
 			},
 		},
 	}
-	nodes, err, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodes, err, _, _,_ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 	c.scheduler.Unlock()
 	if err != nil {
 		return err
