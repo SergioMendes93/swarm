@@ -228,16 +228,21 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	}
 
 	c.scheduler.Unlock()
-	
-	//if this condition is true then we must apply a cut to the request in order to fit it 
-	if cut {
-		switch requestClass {
-			case "2":
-				break
-			case "3":
-				break
-			case "4":
-				break
+
+	fmt.Println(c.scheduler.Strategy())
+	strategy := c.scheduler.Strategy()
+	if strategy == "energy"
+	{
+		//if this condition is true then we must apply a cut to the request in order to fit it 
+		if cut {
+			switch requestClass {
+				case "2":
+					break
+				case "3":
+					break
+				case "4":
+					break
+			}
 		}
 	}
 
@@ -253,13 +258,13 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).Debugf("Scheduling container %s to ", containerFlag)
 	}
 
-	
-	taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
-	taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
+	if strategy == "energy" {	
+		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
+		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 
-	go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, "0")
-	go SendInfoHost(requestClass, "1")
-	
+		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, "0")
+		go SendInfoHost(requestClass, "1")
+	}
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
 	c.scheduler.Unlock()
