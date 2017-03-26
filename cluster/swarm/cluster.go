@@ -253,15 +253,28 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).Debugf("Scheduling container %s to ", containerFlag)
 	}
 
-	//Update Task Registry with the task that was just created
-	url := "http://192.168.1.154:1234/task/"+requestClass
 	
 	taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 	taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
-	values := map[string]string{"TaskID":container.ID, "TaskClass":requestClass,"CPU": taskCPU, "Image": config.Image,
+
+	go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, "0")
+	go SendInfoHost(requestClass, "1")
+	
+	c.scheduler.Lock()
+	delete(c.pendingContainers, swarmID)
+	c.scheduler.Unlock()
+
+	return container, err
+}
+
+
+
+//used to send updates to task registry
+func SendInfoTask(containerID string, requestClass string, taskCPU string, image string, taskMemory string, requestType string, cutReceived string) {
+	//Update Task Registry with the task that was just created
+	url := "http://192.168.1.154:1234/task/"+requestClass
+	values := map[string]string{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
 									"Memory": taskMemory, "TaskType": requestType, "CutReceived": "nada"}  
-	//var jsonStr = []byte(`{	"TaskID": "container.ID","TaskClass":requestClass,"Image": 
-	//	"CPU":"config.HostConfig.CPUShares", "Memory": "config.HostConfig.Memory", "TaskType": "nadaporagora", "CutReceived": "nada_por_agora"}`)
 	jsonStr, _ := json.Marshal(values)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
@@ -276,11 +289,23 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	}
 	defer resp.Body.Close()
 
-	c.scheduler.Lock()
-	delete(c.pendingContainers, swarmID)
-	c.scheduler.Unlock()
+}
 
-	return container, err
+//used to send updates to host Registry
+func SendInfoHost(requestClass string, hostID string) {
+	url := "http://192.168.1.154:12345/host/updateclass/"+requestClass+"&"+hostID
+
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("Content-Type", "application/json")
+		
+	client := &http.Client{}
+	resp, err := client.Do(req)
+		
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 }
 
 // RemoveContainer aka Remove a container from the cluster.

@@ -24,6 +24,7 @@ type Node struct {
 	HealthIndicator int64
 }
 
+
 // NewNode creates a node from an engine.
 func NewNode(e *cluster.Engine) *Node {
 	//TODO: Para identificar o host à qual este worker pertence usar as labels
