@@ -64,11 +64,14 @@ func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
 	
 	seed := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(seed)
-	randomNumber := r1.Intn(numWorkers)	
-
-	fmt.Println("random number")
+	randomNumber := r1.Intn(numWorkers)		
+	
 	fmt.Println(randomNumber)
-
+	
+	if randomNumber != 0 {
+		randomNumber = randomNumber - 1
+	}
+	
 	for j := 0; j < len(nodes); j++ {
 		if nodes[j].ID == host.WorkerNodesID[randomNumber] && nodes[j].Name != "manager1" {
 			output = append(output, nodes[j])
