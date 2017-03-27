@@ -35,12 +35,18 @@ type Task struct {
 	TaskClass string			`json:"taskclass,omitempty"`
 	Image string				`json:"image,omitempty"`
 	CPU string					`json:"cpu,omitempty"`
+	TotalResources string		`json:"totalresources,omitempty"`
 	Memory string				`json:"memory,omitempty"`
     TaskType string             `json:"tasktype,omitempty"`
     CutReceived string          `json:"cutreceived,omitempty"`
+	CutToReceive string			`json:"cuttoreceive,omitempty"`
 }
 
 var ipAddress = "192.168.1.154"
+
+var MAX_CUT_CLASS2 = 0.0
+var MAX_CUT_CLASS3 = 0.0
+var MAX_CUT_CLASS4 = 0.0
 
 // EnergyPlacementStrategy randomly places the container into the cluster.
 type EnergyPlacementStrategy struct {
@@ -239,21 +245,21 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 
 		host := listHostsLEE_DEE[i]		
 
-		
 		if host.HostClass >= requestClass && requestClass != "4" {
-			//listTasks = append(listTasks, GetTasks("http://" + host.HostIP + ":1234/task/higher/" + requestClass)
-			listTasks = append(listTasks, GetTasks("http://"+ipAddress+":1234/task/higher/" + requestClass)...)
-		//} //else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
-		//	return host, true, requestClass	//requestClass indicates the cut received, performed at /cluster/swarm/cluster.go
+			//listTasks = append(listTasks, GetTasks("http://" + host.HostIP + ":1234/task/highercut/" + requestClass)
+			listTasks = append(listTasks, GetTasks("http://"+ipAddress+":1234/task/highercut/" + requestClass)...)
+		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
+			return host, true, requestClass	//requestClass indicates the cut received, performed at /cluster/swarm/cluster.go
 		} else if requestClass != "1" {
-			listTasks = append(listTasks, GetTasks("http://"+ipAddress+":1234/task/equalhigher/" + requestClass)...)
+			listTasks = append(listTasks, GetTasks("http://"+ipAddress+":1234/task/equalhigher/" + requestClass+"&"+host.HostClass)...)
 		}
 		
 		newCPU := 0.0
 		newMemory := 0.0
 		
+		//TODO REPENSAR ESTA PARTE: Se nao conseguirmos cortar o request, o que acontece daqui em diante. Analisar como esta o codigo
 		if requestClass != "1" {
-			newMemory,newCPU = applyCut(requestClass, config)
+			newMemory,newCPU,_ = applyCut(requestClass, config, host.HostClass)
 		} 
 	
 		for _, task := range listTasks {
@@ -270,6 +276,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		}
 		//return host, false, requestClass 
 	}
+	//TODO: este return esta assim para efeitos de teste, depois repensar nisto
 	return listHostsLEE_DEE[0], false, requestClass
 }
 
@@ -277,9 +284,10 @@ func cutRequests(cutList []Task) {
 	for _, task := range cutList {
 		newCPU, err := strconv.ParseFloat(task.CPU, 64) 
 		newMemory, err := strconv.ParseFloat(task.Memory, 64) 
+		amountToCut, err := strconv.ParseFloat(task.CutToReceive,64)
 
-		newCPU *= 0.2
-		newMemory *= 0.2
+		newCPU *= amountToCut
+		newMemory *= amountToCut
 
 		if err != nil {
 			fmt.Println(err)
@@ -287,9 +295,10 @@ func cutRequests(cutList []Task) {
 		cpu := strconv.FormatFloat(newCPU, 'f', -1, 64)
 		memory := strconv.FormatFloat(newMemory, 'f', -1, 64)
 	
-		cutReceived := "20"
+		//TODO: Para testes, isto depois é removido, no updatetask vai ser substituido pelo Up
+		cut := strconv.FormatFloat(amountToCut, 'f', -1, 64)
 
-		go UpdateTask("http://"+ipAddress+":1234/task/updatetask/"+task.TaskClass+"&"+cpu+"&"+memory+"&"+task.TaskID+"&"+cutReceived)
+		go UpdateTask("http://"+ipAddress+":1234/task/updatetask/"+task.TaskClass+"&"+cpu+"&"+memory+"&"+task.TaskID+"&"+cut)
 		go UpdateTask("http://"+ipAddress+":12345/host/updatetask/"+task.TaskID+"&"+cpu+"&"+memory)
 	}
 }
@@ -315,26 +324,11 @@ func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, 
 	memoryReduction := 0.0
 	
 	for _, task := range cutList {
-		switch task.TaskClass {
-			case "2":
-				taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
-				taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
-				cpuReduction += taskCPU * 0.2
-				memoryReduction +=  taskMemory * 0.2
-				break
-			case "3":
-				taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
-				taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
-				cpuReduction += taskCPU * 0.2
-				memoryReduction +=  taskMemory * 0.2
-				break
-			case "4":
-				taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
-				taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
-				cpuReduction += taskCPU * 0.2
-				memoryReduction +=  taskMemory * 0.2
-				break
-		}
+		cut,_ := strconv.ParseFloat(task.CutToReceive, 64)
+		taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
+		taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
+		cpuReduction += taskCPU * cut
+		memoryReduction +=  taskMemory * cut
 	}
 
 	//after cutting the tasks, the host will have the following memory and cpu
@@ -348,32 +342,63 @@ func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, 
 		return false
 	}
 	
-	return true	
+	return true //TODO: para efeito de testes: depois mudar para false
 }
 
 //por enquanto esta float mas depois mudar para int
-func applyCut(requestClass string, config *cluster.ContainerConfig) (float64, float64){
-	
+func applyCut(requestClass string, config *cluster.ContainerConfig, hostClass string) (float64, float64, bool){
 	switch requestClass {
 		case "2":
-			newMemory := float64(config.HostConfig.Memory) * 0.2
-			newCPU := float64(config.HostConfig.CPUShares) * 0.2
-			return newMemory, newCPU
+			 //Applying cut restrictions
+			if hostClass == "1" {
+				newMemory := float64(config.HostConfig.Memory) * MAX_CUT_CLASS2
+				newCPU := float64(config.HostConfig.CPUShares) * MAX_CUT_CLASS2
+				return newMemory, newCPU, true
+			}else {
+				return 0.0,0.0, false
+			}
 		case "3":
-			newMemory := float64(config.HostConfig.Memory) * 0.3
-			newCPU := float64(config.HostConfig.CPUShares) * 0.3
-			return newMemory, newCPU
+			if hostClass == "1" {
+				newMemory := float64(config.HostConfig.Memory) * MAX_CUT_CLASS3
+				newCPU := float64(config.HostConfig.CPUShares) * MAX_CUT_CLASS3
+				return newMemory, newCPU, true
+			} else if hostClass == "2" {
+				cutItCanReceive := MAX_CUT_CLASS2 - MAX_CUT_CLASS3
+				newMemory := float64(config.HostConfig.Memory) * cutItCanReceive
+				newCPU := float64(config.HostConfig.CPUShares) * cutItCanReceive
+				return newMemory, newCPU, true
+			} else {
+				return 0.0,0.0,false
+			}
 		case "4":
-			newMemory := float64(config.HostConfig.Memory) * 0.4
-			newCPU := float64(config.HostConfig.CPUShares) * 0.4
-			return newMemory, newCPU
+			if hostClass == "1" {
+				newMemory := float64(config.HostConfig.Memory) * MAX_CUT_CLASS4
+				newCPU := float64(config.HostConfig.CPUShares) * MAX_CUT_CLASS4
+				return newMemory, newCPU, true
+			} else if hostClass == "2" {
+				cutItCanReceive := MAX_CUT_CLASS2 - MAX_CUT_CLASS4
+				newMemory := float64(config.HostConfig.Memory) * cutItCanReceive
+				newCPU := float64(config.HostConfig.CPUShares) * cutItCanReceive
+				return newMemory, newCPU, true
+			} else if hostClass == "3" {
+				cutItCanReceive := MAX_CUT_CLASS3 - MAX_CUT_CLASS4
+				newMemory := float64(config.HostConfig.Memory) * cutItCanReceive
+				newCPU := float64(config.HostConfig.CPUShares) * cutItCanReceive
+				return newMemory, newCPU, true
+			} else {
+				return 0.0, 0.0, false
+			}
 	}
-	return 0.0,0.0
+	return 0.0,0.0, false
 }
 
 func afterCutRequestFits(requestClass string, host *Host, config *cluster.ContainerConfig) (bool) {
 
-	newMemory, newCPU := applyCut(requestClass, config)
+	newMemory, newCPU, canCut := applyCut(requestClass, config, host.HostClass)
+	
+	if !canCut {
+		return false
+	}
 	
 	if float64(host.AvailableMemory) > newMemory && float64(host.AvailableCPUs) > newCPU {
 		return true

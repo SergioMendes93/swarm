@@ -229,10 +229,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 	c.scheduler.Unlock()
 
-	fmt.Println(c.scheduler.Strategy())
 	strategy := c.scheduler.Strategy()
-	if strategy == "energy"
-	{
+	if strategy == "energy" {
 		//if this condition is true then we must apply a cut to the request in order to fit it 
 		if cut {
 			switch requestClass {
