@@ -71,9 +71,7 @@ func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
 	seed := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(seed)
 	randomNumber := r1.Intn(numWorkers)		
-	
-	fmt.Println(randomNumber)
-	
+		
 	if randomNumber != 0 {
 		randomNumber = randomNumber - 1
 	}
@@ -81,6 +79,8 @@ func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
 	for j := 0; j < len(nodes); j++ {
 		if nodes[j].ID == host.WorkerNodesID[randomNumber] && nodes[j].Name != "manager1" {
 			output = append(output, nodes[j])
+			fmt.Println("O que quero analisar")
+			fmt.Println(output)
 			return output
 		}
 	}
@@ -200,26 +200,10 @@ func requestFitsAfterKills(killList []Task, host *Host, config *cluster.Containe
 	memoryReduction := 0.0
 	
 	for _, task := range killList {
-		switch task.TaskClass {
-			case "2":
-				taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
-				taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
-				cpuReduction += taskCPU 
-				memoryReduction +=  taskMemory
-				break
-			case "3":
-				taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
-				taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
-				cpuReduction += taskCPU 
-				memoryReduction +=  taskMemory 
-				break
-			case "4":
-				taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
-				taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
-				cpuReduction += taskCPU 
-				memoryReduction +=  taskMemory
-				break
-		}
+		taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
+		taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
+		cpuReduction += taskCPU 
+		memoryReduction +=  taskMemory
 	}
 
 	//after killing the tasks, the host will have the following memory and cpu
@@ -256,11 +240,18 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		
 		newCPU := 0.0
 		newMemory := 0.0
+		canCut := false
 		
-		//TODO REPENSAR ESTA PARTE: Se nao conseguirmos cortar o request, o que acontece daqui em diante. Analisar como esta o codigo
 		if requestClass != "1" {
-			newMemory,newCPU,_ = applyCut(requestClass, config, host.HostClass)
-		} 
+			newMemory,newCPU,canCut = applyCut(requestClass, config, host.HostClass)
+			if !canCut { //if we cannot cut the request we use the original memory and cpu values
+				newCPU = float64(config.HostConfig.CPUShares)
+				newMemory = float64(config.HostConfig.Memory)				
+			}
+		} else { //if its a request class 1
+			newCPU = float64(config.HostConfig.CPUShares)
+			newMemory = float64(config.HostConfig.Memory)
+		}
 	
 		for _, task := range listTasks {
 			if task.TaskClass == "1" {
