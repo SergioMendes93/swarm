@@ -3,6 +3,8 @@ package node
 import (
 	"errors"
 	"net/http"
+	"bytes"
+	"encoding/json"
 	"github.com/docker/swarm/cluster"
 )
 
@@ -33,18 +35,6 @@ func NewNode(e *cluster.Engine) *Node {
 /*	if e.Name != "manager1" {
 		url := "http://192.168.1.154:12345/host/addworker/1"
 	
-		var jsonStr = []byte(`{	"ID": "e.ID",
-		"IP":             "e.IP",
-		"Addr":           "e.Addr",
-		"Name":           "e.Name",
-		"Labels":          "e.Labels",
-		"Containers":      "e.Containers()",
-		"Images":          "e.Images()",
-		"UsedMemory":      "e.UsedMemory()",
-		"UsedCpus":        "e.UsedCpus()",
-		"TotalMemory":     "e.TotalMemory()",
-		"TotalCpus":       "e.TotalCpus()",
-		"HealthIndicator": "e.HealthIndicator()"}`)
 
 		req, err := http.NewRequest("GET", url, nil)
 		req.Header.Set("X-Custom-Header", "myvalue")
@@ -60,8 +50,37 @@ func NewNode(e *cluster.Engine) *Node {
 		defer resp.Body.Close()
 	}*/
 	if e.Name != "manager1" {
-		url := "http://192.168.1.154:12345/host/addworker/4&"+e.ID
-		req, err := http.NewRequest("GET", url, nil)
+		//url := "http://192.168.1.168:12345/host/addworker/4&"+e.ID
+		url := "http://192.168.1.168:12345/host/addworker/4&"+e.ID
+
+/*		var jsonStr = []byte(`{	"ID:" `e.ID`,
+		"IP":             `e.IP`,
+		"Addr":           `e.Addr`,
+		"Name":           `e.Name`,
+		"Labels":          `e.Labels`,
+		"Containers":      `e.Containers()`,
+		"Images":          `e.Images()`,
+		"UsedMemory":      `e.UsedMemory()`,
+		"UsedCpus":        `e.UsedCpus()`,
+		"TotalMemory":     `e.TotalMemory()`,
+		"TotalCpus":       `e.TotalCpus()`,
+		"HealthIndicator": `e.HealthIndicator()`}`)
+*/		
+		marshalled, _ := json.Marshal(Node{
+		ID:              e.ID,
+		IP:              e.IP,
+		Addr:            e.Addr,
+		Name:            e.Name,
+		Labels:          e.Labels,
+		Containers:      e.Containers(),
+		Images:          e.Images(),
+		UsedMemory:      e.UsedMemory(),
+		UsedCpus:        e.UsedCpus(),
+		TotalMemory:     e.TotalMemory(),
+		TotalCpus:       e.TotalCpus(),
+		HealthIndicator: e.HealthIndicator()})
+
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(marshalled))
 		req.Header.Set("X-Custom-Header", "myvalue")
 		req.Header.Set("Content-Type", "application/json")
 		

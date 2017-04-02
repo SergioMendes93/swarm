@@ -275,7 +275,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 //used to send updates to task registry
 func SendInfoTask(containerID string, requestClass string, taskCPU string, image string, taskMemory string, requestType string, cutReceived string) {
 	//Update Task Registry with the task that was just created
-	url := "http://192.168.1.154:1234/task/"+requestClass
+	url := "http://192.168.1.168:1234/task/"+requestClass
 	values := map[string]string{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
 									"Memory": taskMemory, "TaskType": requestType, "CutReceived": "nada"}  
 	jsonStr, _ := json.Marshal(values)
@@ -296,7 +296,7 @@ func SendInfoTask(containerID string, requestClass string, taskCPU string, image
 
 //used to send updates to host Registry
 func SendInfoHost(requestClass string, hostID string) {
-	url := "http://192.168.1.154:12345/host/updateclass/"+requestClass+"&"+hostID
+	url := "http://192.168.1.168:12345/host/updateclass/"+requestClass+"&"+hostID
 
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("X-Custom-Header", "myvalue")

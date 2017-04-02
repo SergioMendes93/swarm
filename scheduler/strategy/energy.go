@@ -16,8 +16,7 @@ import (
 type Host struct {
         HostID      string              	`json:"hostid,omitempty"`
 		HostIP		string					`json:"hostip,omitempty"`
-        WorkerNodesID []string          	`json:"workernodesid,omitempty"`
-		WorkesNodes []*node.Node			`json:"workernodes,omitempty"`
+		WorkerNodes []*node.Node			`json:"workernodes,omitempty"`
         HostClass   string              	`json:"hostclass,omitempty"`
         Region      string              	`json:"region,omitempty"`
         TotalResourcesUtilization string   	`json:"totalresouces,omitempty"`
@@ -42,7 +41,7 @@ type Task struct {
 	CutToReceive string			`json:"cuttoreceive,omitempty"`
 }
 
-var ipAddress = "192.168.1.154"
+var ipAddress = "192.168.1.168"
 
 var MAX_CUT_CLASS2 = 0.0
 var MAX_CUT_CLASS3 = 0.0
@@ -66,7 +65,7 @@ func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
 	output := make([]*node.Node,0)
 
 	//going to choose a worker randomly from the host
-	numWorkers := len(host.WorkerNodesID)
+	numWorkers := len(host.WorkerNodes)
 	
 	seed := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(seed)
@@ -75,15 +74,9 @@ func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
 	if randomNumber != 0 {
 		randomNumber = randomNumber - 1
 	}
+
+	output = append(output, host.WorkerNodes[randomNumber])
 	
-	for j := 0; j < len(nodes); j++ {
-		if nodes[j].ID == host.WorkerNodesID[randomNumber] && nodes[j].Name != "manager1" {
-			output = append(output, nodes[j])
-			fmt.Println("O que quero analisar")
-			fmt.Println(output)
-			return output
-		}
-	}
 	return output
 }
 
