@@ -5,6 +5,7 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/scheduler/filter"
 
+	"math"
 	"time"
 	"math/rand"	
 	"net/http"	
@@ -14,19 +15,20 @@ import (
 )
 
 type Host struct {
-        HostID      string              	`json:"hostid,omitempty"`
-		HostIP		string					`json:"hostip,omitempty"`
-		WorkerNodes []*node.Node			`json:"workernodes,omitempty"`
-        HostClass   string              	`json:"hostclass,omitempty"`
-        Region      string              	`json:"region,omitempty"`
-        TotalResourcesUtilization string   	`json:"totalresouces,omitempty"`
-        CPU_Utilization int             	`json:"cpu,omitempty"`
-        MemoryUtilization int           	`json:"memory,omitempty"`
-		AvailableCPUs int64					`json:"availablecpus,omitempty"`
-        AvailableMemory int64				`json:"availablememory,omitempty"`
-		AllocatedResources int          	`json:"resoucesallocated,omitempty"`
-        TotalHostResources int          	`json:"totalresources,omitempty"`
-        OverbookingFactor int           	`json:"overbookingfactor,omitempty"`
+	HostID                    string       `json:"hostid,omitempty"`
+    HostIP                    string       `json:"hostip, omitempty"`
+    WorkerNodes               []*node.Node `json:"workernodes,omitempty"`
+    HostClass                 string       `json:"hostclass,omitempty"`
+    Region                    string       `json:"region,omitempty"`
+    TotalResourcesUtilization string       `json:"totalresouces,omitempty"`
+    CPU_Utilization           string       `json:"cpu,omitempty"`
+    MemoryUtilization         string       `json:"memory,omitempty"`
+    AllocatedMemory           float64      `json:"allocatedmemory,omitempty"`
+    AllocatedCPUs             float64      `json:"allocatedcpus,omitempty"`
+    OverbookingFactor         float64      `json:"overbookingfactor,omitempty"`
+    TotalMemory               float64      `json:"totalmemory,omitempty"`
+    TotalCPUs                 float64      `json:"totalcpus, omitempty"`
+
 }
 
 type Task struct {
@@ -42,6 +44,11 @@ type Task struct {
 }
 
 var ipAddress = "192.168.1.168"
+
+var MAX_OVERBOOKING_CLASS1 = 1.0
+var MAX_OVERBOOKING_CLASS2 = 1.2
+var MAX_OVERBOOKING_CLASS3 = 1.5
+var MAX_OVERBOOKING_CLASS4 = 2.0
 
 var MAX_CUT_CLASS2 = 0.0
 var MAX_CUT_CLASS3 = 0.0
@@ -80,6 +87,38 @@ func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
 	return output
 }
 
+func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedMemory float64, requestCPUs float64, requestMemory float64) bool {
+	//Lets get the new overbooking factor after the request is allocated  (worst case estimation because we assume that they are going to use all the resources)
+	overbookingMemory := (hostAllocatedMemory + requestMemory)/host.TotalMemory
+	overbookingCPUs := 	(hostAllocatedCPUs + requestCPUs)/host.TotalCPUs
+
+	newOverbooking := math.Max(overbookingMemory,overbookingCPUs)
+	switch host.HostClass {
+		case "1":
+			if newOverbooking < MAX_OVERBOOKING_CLASS1 {
+				return true
+			}
+			break
+		case "2":
+			if newOverbooking < MAX_OVERBOOKING_CLASS2 {
+				return true
+			}
+			break
+		case "3":
+			if newOverbooking < MAX_OVERBOOKING_CLASS3 {
+				return true
+			}
+
+			break
+		case "4":
+			if newOverbooking < MAX_OVERBOOKING_CLASS4 {
+				return true
+			}
+			break
+	}
+	return false
+}
+
 // RankAndSort randomly sorts the list of nodes.
 func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, bool) {
 
@@ -108,9 +147,10 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 //------------ Scheduling without cuts and kills----------------------------------------------------------
 
 	for i := 0; i < len(listHostsLEE_DEE); i++ {
-		//check if host has enough resources to accomodate the request, if it does, return it
+		//we must check if after allocating this request the overbooking factor of the host doesnt go over the host maximum overbooking allowed
+		//if it does no go over it, then the request can be scheduled to this host
 		host := listHostsLEE_DEE[i]
-		if host.AvailableMemory > config.HostConfig.Memory && host.AvailableCPUs > config.HostConfig.CPUShares {
+		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.Memory), float64(config.HostConfig.CPUShares)) {
 			return findNode(host,nodes), nil, requestClass, requestType, false
 		}
 			
@@ -200,18 +240,11 @@ func requestFitsAfterKills(killList []Task, host *Host, config *cluster.Containe
 	}
 
 	//after killing the tasks, the host will have the following memory and cpu
-	hostMemory := float64(host.AvailableMemory) - memoryReduction
-	hostCPU := float64(host.AvailableCPUs) - cpuReduction
-	
-	//lets see if after those kill the request will now fit
-	if hostMemory > float64(config.HostConfig.Memory) && hostCPU > float64(config.HostConfig.CPUShares) {
-		return true
-	} else {
-		return false
-	}
-	
-	return true	
+	hostMemory := host.AllocatedMemory - memoryReduction
+	hostCPU := host.AllocatedCPUs - cpuReduction
 
+	//lets see if after those kill the request will now fit
+	return CheckOverbookingLimit(host, hostCPU, hostMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory))	
 }
 
 func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool, string) {
@@ -270,8 +303,8 @@ func cutRequests(cutList []Task) {
 		newMemory, err := strconv.ParseFloat(task.Memory, 64) 
 		amountToCut, err := strconv.ParseFloat(task.CutToReceive,64)
 
-		newCPU *= amountToCut
-		newMemory *= amountToCut
+		newCPU *= (1 - amountToCut)
+		newMemory *= (1 - amountToCut)
 
 		if err != nil {
 			fmt.Println(err)
@@ -316,17 +349,11 @@ func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, 
 	}
 
 	//after cutting the tasks, the host will have the following memory and cpu
-	hostMemory := float64(host.AvailableMemory) - memoryReduction
-	hostCPU := float64(host.AvailableCPUs) - cpuReduction
+	hostMemory := host.AllocatedMemory - memoryReduction
+	hostCPU := host.AllocatedCPUs - cpuReduction
 	
 	//lets see if after those cuts the request will now fit
-	if hostMemory > memory && hostCPU > cpu {
-		return true
-	} else {
-		return false
-	}
-	
-	return true //TODO: para efeito de testes: depois mudar para false
+	return CheckOverbookingLimit(host, hostCPU, hostMemory, cpu, memory)
 }
 
 //por enquanto esta float mas depois mudar para int
@@ -335,39 +362,39 @@ func applyCut(requestClass string, config *cluster.ContainerConfig, hostClass st
 		case "2":
 			 //Applying cut restrictions
 			if hostClass == "1" {
-				newMemory := float64(config.HostConfig.Memory) * MAX_CUT_CLASS2
-				newCPU := float64(config.HostConfig.CPUShares) * MAX_CUT_CLASS2
+				newMemory := float64(config.HostConfig.Memory) * (1 - MAX_CUT_CLASS2)
+				newCPU := float64(config.HostConfig.CPUShares) * (1 - MAX_CUT_CLASS2)
 				return newMemory, newCPU, true
 			}else {
 				return 0.0,0.0, false
 			}
 		case "3":
 			if hostClass == "1" {
-				newMemory := float64(config.HostConfig.Memory) * MAX_CUT_CLASS3
-				newCPU := float64(config.HostConfig.CPUShares) * MAX_CUT_CLASS3
+				newMemory := float64(config.HostConfig.Memory) * (1 - MAX_CUT_CLASS3)
+				newCPU := float64(config.HostConfig.CPUShares) * (1 - MAX_CUT_CLASS3)
 				return newMemory, newCPU, true
 			} else if hostClass == "2" {
-				cutItCanReceive := MAX_CUT_CLASS2 - MAX_CUT_CLASS3
-				newMemory := float64(config.HostConfig.Memory) * cutItCanReceive
-				newCPU := float64(config.HostConfig.CPUShares) * cutItCanReceive
+				cutItCanReceive := MAX_CUT_CLASS3 - MAX_CUT_CLASS2
+				newMemory := float64(config.HostConfig.Memory) * (1 - cutItCanReceive)
+				newCPU := float64(config.HostConfig.CPUShares) * (1 - cutItCanReceive)
 				return newMemory, newCPU, true
 			} else {
 				return 0.0,0.0,false
 			}
 		case "4":
 			if hostClass == "1" {
-				newMemory := float64(config.HostConfig.Memory) * MAX_CUT_CLASS4
-				newCPU := float64(config.HostConfig.CPUShares) * MAX_CUT_CLASS4
+				newMemory := float64(config.HostConfig.Memory) * (1 - MAX_CUT_CLASS4)
+				newCPU := float64(config.HostConfig.CPUShares) * (1 - MAX_CUT_CLASS4)
 				return newMemory, newCPU, true
 			} else if hostClass == "2" {
-				cutItCanReceive := MAX_CUT_CLASS2 - MAX_CUT_CLASS4
-				newMemory := float64(config.HostConfig.Memory) * cutItCanReceive
-				newCPU := float64(config.HostConfig.CPUShares) * cutItCanReceive
+				cutItCanReceive := MAX_CUT_CLASS4 - MAX_CUT_CLASS2
+				newMemory := float64(config.HostConfig.Memory) * (1 - cutItCanReceive)
+				newCPU := float64(config.HostConfig.CPUShares) * (1 - cutItCanReceive)
 				return newMemory, newCPU, true
 			} else if hostClass == "3" {
-				cutItCanReceive := MAX_CUT_CLASS3 - MAX_CUT_CLASS4
-				newMemory := float64(config.HostConfig.Memory) * cutItCanReceive
-				newCPU := float64(config.HostConfig.CPUShares) * cutItCanReceive
+				cutItCanReceive := MAX_CUT_CLASS4 - MAX_CUT_CLASS3
+				newMemory := float64(config.HostConfig.Memory) * (1 - cutItCanReceive)
+				newCPU := float64(config.HostConfig.CPUShares) * (1 - cutItCanReceive)
 				return newMemory, newCPU, true
 			} else {
 				return 0.0, 0.0, false
@@ -383,13 +410,7 @@ func afterCutRequestFits(requestClass string, host *Host, config *cluster.Contai
 	if !canCut {
 		return false
 	}
-	
-	if float64(host.AvailableMemory) > newMemory && float64(host.AvailableCPUs) > newCPU {
-		return true
-	} else {
-		return false
-	}
-	return false
+	return CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, newCPU, newMemory)	
 }
 
 func GetTasks(url string) ([]Task) {
