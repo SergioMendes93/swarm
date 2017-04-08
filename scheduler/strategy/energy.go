@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"fmt"
+	"net"
 )
 
 type Host struct {
@@ -43,7 +44,8 @@ type Task struct {
 	CutToReceive string			`json:"cuttoreceive,omitempty"`
 }
 
-var ipAddress = "192.168.1.168"
+var ipAddress = "192.168.1.4"
+//var ipAddress = getIPAddress()
 
 var MAX_OVERBOOKING_CLASS1 = 1.0
 var MAX_OVERBOOKING_CLASS2 = 1.2
@@ -286,7 +288,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			cutList = append(cutList, task)
 			
 			if fitAfterCuts(requestClass, host, newMemory, newCPU, cutList) {
-				cutRequests(cutList)
+				go cutRequests(cutList)
 				fmt.Println("Cut done") 
 				return host, true, requestClass
 			}
@@ -452,3 +454,19 @@ func GetHosts(url string) ([]*Host) {
 	return listHosts
 }
 
+func getIPAddress() string {
+    addrs, err := net.InterfaceAddrs()
+    if err != nil {
+        fmt.Println(err.Error())
+    }
+    counter := 0
+    for _, a := range addrs {
+        if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+            if ipnet.IP.To4() != nil && counter == 1{
+                return ipnet.IP.String()
+            }
+            counter++
+        }
+    }
+    return ""
+}

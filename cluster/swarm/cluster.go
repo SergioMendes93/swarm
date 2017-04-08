@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"bytes"
 	"strconv"
+	"net"
 	"encoding/json"
 
 	log "github.com/Sirupsen/logrus"
@@ -235,10 +236,16 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		if cut {
 			switch requestClass {
 				case "2":
+					//config.HostConfig.CPUShares *= 0.8
+					//config.HostConfig.Memory *= 0.8
 					break
 				case "3":
+					//config.HostConfig.CPUShares *= 0.6
+					//config.HostConfig.Memory *= 0.6
 					break
 				case "4":
+					//config.HostConfig.CPUShares *= 0.5
+					//config.HostConfig.Memory *= 0.5
 					break
 			}
 		}
@@ -261,7 +268,10 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 
 		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, "0")
-		go SendInfoHost(requestClass, "1")
+		//TODO este 1 tem que ser mudado para o id do host
+		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateclass/"+requestClass+"&1")
+		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/1&"+taskCPU+"&"+taskMemory)
+		go SendInfoMonitor(container.ID)
 	}
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
@@ -270,12 +280,28 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	return container, err
 }
 
+//send task ID to monitor so it nows what to monitor
+func SendInfoMonitor(containerID string) {
+	url := "http://"+getIPAddress()+":8080/newtask/?id="+containerID
+	req, err := http.NewRequest("GET", url, nil)
+    req.Header.Set("X-Custom-Header", "myvalue")
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+}
+
 
 
 //used to send updates to task registry
 func SendInfoTask(containerID string, requestClass string, taskCPU string, image string, taskMemory string, requestType string, cutReceived string) {
 	//Update Task Registry with the task that was just created
-	url := "http://192.168.1.168:1234/task/"+requestClass
+	url := "http://"+getIPAddress()+":1234/task/"+requestClass
 	values := map[string]string{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
 									"Memory": taskMemory, "TaskType": requestType, "CutReceived": "nada"}  
 	jsonStr, _ := json.Marshal(values)
@@ -295,8 +321,7 @@ func SendInfoTask(containerID string, requestClass string, taskCPU string, image
 }
 
 //used to send updates to host Registry
-func SendInfoHost(requestClass string, hostID string) {
-	url := "http://192.168.1.168:12345/host/updateclass/"+requestClass+"&"+hostID
+func SendInfoHost(url string) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("X-Custom-Header", "myvalue")
@@ -1088,4 +1113,20 @@ func (c *Cluster) TagImage(IDOrName string, ref string, force bool) error {
 	}
 
 	return err
+}
+
+func getIPAddress() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil{
+				return "192.168.1.4"
+				//return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
 }
