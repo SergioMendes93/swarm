@@ -32,6 +32,8 @@ import (
 	"github.com/samalba/dockerclient"
 )
 
+var ipTaskRegistry = "146.193.41.143"
+
 type pendingContainer struct {
 	Config *cluster.ContainerConfig
 	Name   string
@@ -282,7 +284,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 //send task ID to monitor so it nows what to monitor
 func SendInfoMonitor(containerID string) {
-	url := "http://"+getIPAddress()+":8080/newtask/?id="+containerID
+	url := "http://"+ipTaskRegistry+":8080/newtask/?id="+containerID
 	req, err := http.NewRequest("GET", url, nil)
     req.Header.Set("X-Custom-Header", "myvalue")
     req.Header.Set("Content-Type", "application/json")
@@ -301,7 +303,7 @@ func SendInfoMonitor(containerID string) {
 //used to send updates to task registry
 func SendInfoTask(containerID string, requestClass string, taskCPU string, image string, taskMemory string, requestType string, cutReceived string) {
 	//Update Task Registry with the task that was just created
-	url := "http://"+getIPAddress()+":1234/task/"+requestClass
+	url := "http://"+ipTaskRegistry+":1234/task/"+requestClass
 	values := map[string]string{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
 									"Memory": taskMemory, "TaskType": requestType, "CutReceived": "nada"}  
 	jsonStr, _ := json.Marshal(values)
@@ -1123,8 +1125,8 @@ func getIPAddress() string {
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil{
-				return "192.168.1.4"
-				//return ipnet.IP.String()
+				//return "192.168.1.4"
+				return ipnet.IP.String()
 			}
 		}
 	}

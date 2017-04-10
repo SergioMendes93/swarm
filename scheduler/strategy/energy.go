@@ -17,34 +17,35 @@ import (
 
 type Host struct {
 	HostID                    string       `json:"hostid,omitempty"`
-    HostIP                    string       `json:"hostip, omitempty"`
-    WorkerNodes               []*node.Node `json:"workernodes,omitempty"`
-    HostClass                 string       `json:"hostclass,omitempty"`
-    Region                    string       `json:"region,omitempty"`
-    TotalResourcesUtilization string       `json:"totalresouces,omitempty"`
-    CPU_Utilization           string       `json:"cpu,omitempty"`
-    MemoryUtilization         string       `json:"memory,omitempty"`
-    AllocatedMemory           float64      `json:"allocatedmemory,omitempty"`
-    AllocatedCPUs             float64      `json:"allocatedcpus,omitempty"`
-    OverbookingFactor         float64      `json:"overbookingfactor,omitempty"`
-    TotalMemory               float64      `json:"totalmemory,omitempty"`
-    TotalCPUs                 float64      `json:"totalcpus, omitempty"`
+    	HostIP                    string       `json:"hostip, omitempty"`
+    	WorkerNodes               []*node.Node `json:"workernodes,omitempty"`
+    	HostClass                 string       `json:"hostclass,omitempty"`
+    	Region                    string       `json:"region,omitempty"`
+    	TotalResourcesUtilization string       `json:"totalresouces,omitempty"`
+    	CPU_Utilization           string       `json:"cpu,omitempty"`
+    	MemoryUtilization         string       `json:"memory,omitempty"`
+    	AllocatedMemory           float64      `json:"allocatedmemory,omitempty"`
+    	AllocatedCPUs             float64      `json:"allocatedcpus,omitempty"`
+    	OverbookingFactor         float64      `json:"overbookingfactor,omitempty"`
+    	TotalMemory               float64      `json:"totalmemory,omitempty"`
+    	TotalCPUs                 float64      `json:"totalcpus, omitempty"`
 
 }
 
 type Task struct {
-    TaskID string               `json:"taskid,omitempty"`
-	TaskClass string			`json:"taskclass,omitempty"`
-	Image string				`json:"image,omitempty"`
-	CPU string					`json:"cpu,omitempty"`
-	TotalResources string		`json:"totalresources,omitempty"`
-	Memory string				`json:"memory,omitempty"`
-    TaskType string             `json:"tasktype,omitempty"`
-    CutReceived string          `json:"cutreceived,omitempty"`
-	CutToReceive string			`json:"cuttoreceive,omitempty"`
+    	TaskID string           `json:"taskid,omitempty"`
+	TaskClass string	`json:"taskclass,omitempty"`
+	Image string		`json:"image,omitempty"`
+	CPU string		`json:"cpu,omitempty"`
+	TotalResources string	`json:"totalresources,omitempty"`
+	Memory string		`json:"memory,omitempty"`
+    	TaskType string         `json:"tasktype,omitempty"`
+    	CutReceived string      `json:"cutreceived,omitempty"`
+	CutToReceive string	`json:"cuttoreceive,omitempty"`
 }
 
-var ipAddress = "192.168.1.4"
+var ipHostRegistry = ""
+var ipTaskRegistry = "146.193.41.143"
 //var ipAddress = getIPAddress()
 
 var MAX_OVERBOOKING_CLASS1 = 1.0
@@ -124,6 +125,8 @@ func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedM
 // RankAndSort randomly sorts the list of nodes.
 func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, bool) {
 
+	ipHostRegistry = getIPAddress()
+
 	affinities, err := filter.ParseExprs(config.Affinities())
 	requestClass := ""
 	requestType := ""
@@ -143,7 +146,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	}
 
 	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info.. //endereço do manager e port do host registry
-	listHostsLEE_DEE := GetHosts("http://"+ipAddress+":12345/host/list/"+requestClass+"&1")
+	listHostsLEE_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/list/"+requestClass+"&1")
 		
 	
 //------------ Scheduling without cuts and kills----------------------------------------------------------
@@ -160,7 +163,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 //------------------------ Cut algorithm ------------------------
 
 	//obtemos a nova listHostsLEE_DEE, desta vez ordenada de forma diferente	
-	listHostsLEE_DEE = GetHosts("http://192.168.1.154:12345/host/list/"+requestClass+"&2")
+	listHostsLEE_DEE = GetHosts("http://ipHostRegistry:12345/host/list/"+requestClass+"&2")
 	
 	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable { //if true then it means that we have a host that it can be scheduled	
@@ -171,7 +174,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 //-------------------------Kill algorithm ----------------------------
 
-	listHostsEED_DEE := GetHosts("http://"+ipAddress+":12345/host/listkill/"+requestClass)
+	listHostsEED_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/listkill/"+requestClass)
 
 	host, allocable = kill(listHostsEED_DEE, requestClass, requestType, config)
 	
@@ -190,12 +193,12 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 		host := listHostsEED_DEE[i] 
 
 		if requestClass == "4" && requestType == "job"{
-			possibleKillList = append(possibleKillList, GetTasks("http://"+ipAddress+":1234/task/class4")...)
+			possibleKillList = append(possibleKillList, GetTasks("http://"+ipTaskRegistry+":1234/task/class4")...)
 
 		} else if requestClass == "4" {
 			return nil, false
 		} else {
-			possibleKillList = append(possibleKillList, GetTasks("http://"+ipAddress+":1234/task/higher/" + requestClass)...)
+			possibleKillList = append(possibleKillList, GetTasks("http://"+ipTaskRegistry+":1234/task/higher/" + requestClass)...)
 		}
 
 		killList := make([]Task, 0)
@@ -219,14 +222,14 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 
 func reschedule(killList []Task) {
 	for _, task := range killList {
-		go UpdateTask("http://"+ipAddress+":12345/host/reschedule/"+task.CPU+"&"+task.Memory+"&"+task.TaskClass+"&"+task.Image)
+		go UpdateTask("http://"+ipHostRegistry+":12345/host/reschedule/"+task.CPU+"&"+task.Memory+"&"+task.TaskClass+"&"+task.Image)
 	}
 }
 
 func killTasks(killList []Task) {
 	for _, task := range killList {
-		go UpdateTask("http://"+ipAddress+":12345/host/killtask/"+task.TaskID)
-		go UpdateTask("http://"+ipAddress+":1234/task/remove/"+task.TaskID)
+		go UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID)
+		go UpdateTask("http://"+ipTaskRegistry+":1234/task/remove/"+task.TaskID)
 	}
 }
 
@@ -259,11 +262,11 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 
 		if host.HostClass >= requestClass && requestClass != "4" {
 			//listTasks = append(listTasks, GetTasks("http://" + host.HostIP + ":1234/task/highercut/" + requestClass)
-			listTasks = append(listTasks, GetTasks("http://"+ipAddress+":1234/task/highercut/" + requestClass)...)
+			listTasks = append(listTasks, GetTasks("http://"+ipTaskRegistry+":1234/task/highercut/" + requestClass)...)
 		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
 			return host, true, requestClass	//requestClass indicates the cut received, performed at /cluster/swarm/cluster.go
 		} else if requestClass != "1" {
-			listTasks = append(listTasks, GetTasks("http://"+ipAddress+":1234/task/equalhigher/" + requestClass+"&"+host.HostClass)...)
+			listTasks = append(listTasks, GetTasks("http://"+ipTaskRegistry+":1234/task/equalhigher/" + requestClass+"&"+host.HostClass)...)
 		}
 		
 		newCPU := 0.0
@@ -317,23 +320,22 @@ func cutRequests(cutList []Task) {
 		//TODO: Para testes, isto depois é removido, no updatetask vai ser substituido pelo Up
 		cut := strconv.FormatFloat(amountToCut, 'f', -1, 64)
 
-		go UpdateTask("http://"+ipAddress+":1234/task/updatetask/"+task.TaskClass+"&"+cpu+"&"+memory+"&"+task.TaskID+"&"+cut)
-		go UpdateTask("http://"+ipAddress+":12345/host/updatetask/"+task.TaskID+"&"+cpu+"&"+memory)
+		go UpdateTask("http://"+ipTaskRegistry+":1234/task/updatetask/"+task.TaskClass+"&"+cpu+"&"+memory+"&"+task.TaskID+"&"+cut)
+		go UpdateTask("http://"+ipHostRegistry+":12345/host/updatetask/"+task.TaskID+"&"+cpu+"&"+memory)
 	}
 }
 
 func UpdateTask (url string) {
-
 	req, err := http.NewRequest("GET", url, nil)
-    req.Header.Set("X-Custom-Header", "myvalue")
-    req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("Content-Type", "application/json")
 
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        panic(err)
-    }
-    defer resp.Body.Close()
+    	client := &http.Client{}
+    	resp, err := client.Do(req)
+    	if err != nil {
+        	panic(err)
+    	}
+    	defer resp.Body.Close()
 }
 
 //this function checks if after cutting the tasks and incoming request the request fits on this host
@@ -459,13 +461,11 @@ func getIPAddress() string {
     if err != nil {
         fmt.Println(err.Error())
     }
-    counter := 0
     for _, a := range addrs {
         if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-            if ipnet.IP.To4() != nil && counter == 1{
+            if ipnet.IP.To4() != nil {
                 return ipnet.IP.String()
             }
-            counter++
         }
     }
     return ""
