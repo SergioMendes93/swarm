@@ -6,8 +6,8 @@ import (
 	"github.com/docker/swarm/scheduler/filter"
 
 	"math"
-	"time"
-	"math/rand"	
+//	"os/exec"
+//	"math/rand"	
 	"net/http"	
 	"encoding/json"
 	"strconv"
@@ -16,9 +16,8 @@ import (
 )
 
 type Host struct {
-	HostID                    string       `json:"hostid,omitempty"`
     	HostIP                    string       `json:"hostip, omitempty"`
-    	WorkerNodes               []*node.Node `json:"workernodes,omitempty"`
+    	WorkerNodes               []*node.Node    `json:"workernode,omitempty"`
     	HostClass                 string       `json:"hostclass,omitempty"`
     	Region                    string       `json:"region,omitempty"`
     	TotalResourcesUtilization string       `json:"totalresouces,omitempty"`
@@ -70,7 +69,7 @@ func (p *EnergyPlacementStrategy) Initialize() error {
 func (p *EnergyPlacementStrategy) Name() string {
 	return "energy"
 }
-
+/*
 func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
 	output := make([]*node.Node,0)
 
@@ -89,7 +88,7 @@ func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
 	
 	return output
 }
-
+*/
 func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedMemory float64, requestCPUs float64, requestMemory float64) bool {
 	//Lets get the new overbooking factor after the request is allocated  (worst case estimation because we assume that they are going to use all the resources)
 	overbookingMemory := (hostAllocatedMemory + requestMemory)/host.TotalMemory
@@ -125,7 +124,17 @@ func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedM
 // RankAndSort randomly sorts the list of nodes.
 func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, bool) {
 
-	ipHostRegistry = getIPAddress()
+//	ipHostRegistry = getIPAddress()
+	/*cmd := "docker"
+	args := []string{"run", "-itd", "-c", "30", "-m", "500m", "-e", "affinity:requestclass==4", "--name", "lala1", "ubuntu"}
+
+	if err := exec.Command(cmd, args...).Run(); err != nil {
+		fmt.Println("Error using docker run")
+		fmt.Println(err)
+	}*/
+
+	ipHostRegistry = "146.193.41.142"
+	output := make([]*node.Node,0)
 
 	affinities, err := filter.ParseExprs(config.Affinities())
 	requestClass := ""
@@ -155,8 +164,11 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		//we must check if after allocating this request the overbooking factor of the host doesnt go over the host maximum overbooking allowed
 		//if it does no go over it, then the request can be scheduled to this host
 		host := listHostsLEE_DEE[i]
+		fmt.Println(host)
 		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.Memory), float64(config.HostConfig.CPUShares)) {
-			return findNode(host,nodes), nil, requestClass, requestType, false
+			//return findNode(host,nodes), nil, requestClass, requestType, false
+			output = append(output, host.WorkerNodes[0])
+			return output, nil, requestClass, requestType, false
 		}
 			
 	}
@@ -167,7 +179,9 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	
 	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable { //if true then it means that we have a host that it can be scheduled	
-		return findNode(host, nodes), nil, cut, requestType, true
+		//return findNode(host, nodes), nil, cut, requestType, true
+		output = append(output, host.WorkerNodes[0])
+		return output, nil, cut, requestType, true
 	}
 
 	return nodes, nil, requestClass, requestType, false
@@ -179,7 +193,9 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	host, allocable = kill(listHostsEED_DEE, requestClass, requestType, config)
 	
 	if allocable {
-		return findNode(host,nodes), nil, requestClass, requestType,  false
+		//return findNode(host,nodes), nil, requestClass, requestType,  false
+		output = append(output, host.WorkerNodes[0])
+		return output, nil, requestClass, requestType,  false
 	}
 
 //	return nodes, nil, requestClass, requestType, false

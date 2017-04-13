@@ -52,9 +52,11 @@ func NewNode(e *cluster.Engine) *Node {
 
 		defer resp.Body.Close()
 	}*/
+	fmt.Println("Sending")
+	fmt.Println(e.Name)
 	if e.Name != "manager1" {
 		//url := "http://192.168.1.168:12345/host/addworker/4&"+e.ID
-		url := "http://"+getIPAddress()+":12345/host/addworker/4&"+e.ID
+		url := "http://146.193.41.142:12345/host/addworker/4&"+e.IP
 
 /*		var jsonStr = []byte(`{	"ID:" `e.ID`,
 		"IP":             `e.IP`,
@@ -138,17 +140,19 @@ func (n *Node) AddContainer(container *cluster.Container) error {
 }
 
 func getIPAddress() string {
-    addrs, err := net.InterfaceAddrs()
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-    for _, a := range addrs {
-        if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-            if ipnet.IP.To4() != nil {
-	    	return ipnet.IP.String()
+	addrs, err := net.InterfaceAddrs()
+    	if err != nil {
+        	fmt.Println(err.Error())
+    	}
+    	for _, a := range addrs {
+        	if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+            		if ipnet.IP.To4() != nil {
+	    			//return ipnet.IP.String()
 		//  return "192.168.1.4"
-            }
-        }
-    }
-    return ""
+           		 }
+		fmt.Println("IP")
+		fmt.Println(ipnet.IP.String())
+       		 }
+    	}
+    return "146.193.41.143"
 }

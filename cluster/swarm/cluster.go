@@ -271,8 +271,10 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, "0")
 		//TODO este 1 tem que ser mudado para o id do host
-		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateclass/"+requestClass+"&1")
-		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/1&"+taskCPU+"&"+taskMemory)
+		fmt.Println("sending updatehostclass to")
+		fmt.Println(n.IP)
+		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateclass/"+requestClass+"&"+ n.IP)
+		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/"+n.IP+"&"+taskCPU+"&"+taskMemory)
 		go SendInfoMonitor(container.ID)
 	}
 	c.scheduler.Lock()
@@ -1125,8 +1127,8 @@ func getIPAddress() string {
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil{
-				//return "192.168.1.4"
-				return ipnet.IP.String()
+				return "146.193.41.142"
+				//return ipnet.IP.String()
 			}
 		}
 	}
