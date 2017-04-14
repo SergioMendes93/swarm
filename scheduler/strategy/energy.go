@@ -101,7 +101,7 @@ func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedM
 }
 
 // RankAndSort randomly sorts the list of nodes.
-func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, bool) {
+func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, float64) {
 
 //	ipHostRegistry = getIPAddress()
 //	cmd := "docker"
@@ -133,7 +133,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	}	
 
 	if err != nil {
-		return nil, err, "0", requestType, false
+		return nil, err, "0", requestType, 0.0
 	}
 
 	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info.. //endereço do manager e port do host registry
@@ -150,7 +150,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory)) {
 			//return findNode(host,nodes), nil, requestClass, requestType, false
 			output = append(output, host.WorkerNodes[0])
-			return output, nil, requestClass, requestType, false
+			return output, nil, requestClass, requestType, 0.0
 		}
 			
 	}
@@ -163,10 +163,10 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	if allocable { //if true then it means that we have a host that it can be scheduled	
 		//return findNode(host, nodes), nil, cut, requestType, true
 		output = append(output, host.WorkerNodes[0])
-		return output, nil, cut, requestType, true
+		return output, nil, requestClass, requestType, cut
 	}
 
-	return nodes, nil, requestClass, requestType, false
+	return nodes, nil, requestClass, requestType, 0.0
 
 //-------------------------Kill algorithm ----------------------------
 
@@ -177,11 +177,11 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	if allocable {
 		//return findNode(host,nodes), nil, requestClass, requestType,  false
 		output = append(output, host.WorkerNodes[0])
-		return output, nil, requestClass, requestType,  false
+		return output, nil, requestClass, requestType,  0.0
 	}
 
 //	return nodes, nil, requestClass, requestType, false
-	return nil, nil, requestClass, requestType, false //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
+	return nil, nil, requestClass, requestType, 0.0 //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
 }
 
 
@@ -250,7 +250,7 @@ func requestFitsAfterKills(killList []Task, host *Host, config *cluster.Containe
 	return CheckOverbookingLimit(host, hostCPU, hostMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory))	
 }
 
-func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool, string) {
+func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool, float64) {
 		
 	for i := 0; i < len(listHostsLEE_DEE); i++ {
 		cutList := make([]Task,0)
@@ -262,7 +262,8 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			//listTasks = append(listTasks, GetTasks("http://" + host.HostIP + ":1234/task/highercut/" + requestClass)
 			listTasks = append(listTasks, GetTasks("http://"+ipTaskRegistry+":1234/task/highercut/" + requestClass)...)
 		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
-			return host, true, requestClass	//requestClass indicates the cut received, performed at /cluster/swarm/cluster.go
+			cutToReceive := amountToCut(requestClass, host.HostClass)
+			return host, true, cutToReceive	//cutToReceived indicates the cut to be received by this request, performed at /cluster/swarm/cluster.go
 		} else if requestClass != "1" {
 			listTasks = append(listTasks, GetTasks("http://"+ipTaskRegistry+":1234/task/equalhigher/" + requestClass+"&"+host.HostClass)...)
 		}
@@ -290,14 +291,14 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			
 			if fitAfterCuts(requestClass, host, newMemory, newCPU, cutList) {
 				go cutRequests(cutList)
-				fmt.Println("Cut done") 
-				return host, true, requestClass
+				cutToReceive := amountToCut(requestClass, host.HostClass)
+				return host, true, cutToReceive
 			}
 		}
 		//return host, false, requestClass 
 	}
 	//TODO: este return esta assim para efeitos de teste, depois repensar nisto
-	return listHostsLEE_DEE[0], false, requestClass
+	return listHostsLEE_DEE[0], false, 0.0
 }
 
 func cutRequests(cutList []Task) {
@@ -356,6 +357,43 @@ func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, 
 	
 	//lets see if after those cuts the request will now fit
 	return CheckOverbookingLimit(host, hostCPU, hostMemory, cpu, memory)
+}
+
+func amountToCut(requestClass string, hostClass string) (float64) {
+	switch requestClass {
+		case "2":
+                	//Applying cut restrictions
+                        if hostClass == "1" {
+                                return (1 - MAX_CUT_CLASS2)
+                        }else {
+                                return 0.0
+                        }
+			break
+                case "3":
+                        if hostClass == "1" {
+                                return (1 - MAX_CUT_CLASS3)
+                        } else if hostClass == "2" {
+                                cutItCanReceive := MAX_CUT_CLASS3 - MAX_CUT_CLASS2
+                                return (1 - cutItCanReceive)
+                        } else {
+                                return 0.0
+                        }
+			break
+                case "4":
+                        if hostClass == "1" {
+                                return (1 - MAX_CUT_CLASS4)
+                        } else if hostClass == "2" {
+                                cutItCanReceive := MAX_CUT_CLASS4 - MAX_CUT_CLASS2
+                                return (1 - cutItCanReceive)
+                        } else if hostClass == "3" {
+                                cutItCanReceive := MAX_CUT_CLASS4 - MAX_CUT_CLASS3
+                                return (1 - cutItCanReceive)
+                        } else {
+                                return 0.0
+                        }
+			break
+	}
+	return 0.0
 }
 
 //por enquanto esta float mas depois mudar para int

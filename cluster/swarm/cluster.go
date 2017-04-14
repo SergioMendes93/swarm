@@ -236,21 +236,9 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	strategy := c.scheduler.Strategy()
 	if strategy == "energy" {
 		//if this condition is true then we must apply a cut to the request in order to fit it 
-		if cut {
-			switch requestClass {
-				case "2":
-					config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * 0.84))
-					config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) * 0.84))
-					break
-				case "3":
-					config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * 0.67))
-					config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) * 0.67))
-					break
-				case "4":
-					config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * 0.5))
-					config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) * 0.5))
-					break
-			}
+		if cut != 0.0 {
+				config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * (1 - cut)))
+				config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) * (1 - cut)))
 		}
 	}
 
@@ -270,12 +258,11 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 
-		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, "0")
-		//TODO este 1 tem que ser mudado para o id do host
-		fmt.Println("sending updatehostclass to")
-		fmt.Println(n.IP)
+		cutReceived := strconv.FormatFloat(cut,'f',-1,64)
+
+		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, cutReceived )
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateclass/"+requestClass+"&"+ n.IP)
-		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/"+n.IP+"&"+taskCPU+"&"+taskMemory)
+		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/"+n.IP+"&"+taskCPU+"&"+taskMemory+"&"+container.ID)
 		go SendInfoMonitor(container.ID)
 	}
 	c.scheduler.Lock()
@@ -308,7 +295,7 @@ func SendInfoTask(containerID string, requestClass string, taskCPU string, image
 	//Update Task Registry with the task that was just created
 	url := "http://"+ipTaskRegistry+":1234/task/"+requestClass
 	values := map[string]string{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
-									"Memory": taskMemory, "TaskType": requestType, "CutReceived": "nada"}  
+									"Memory": taskMemory, "TaskType": requestType, "CutReceived": cutReceived}  
 	jsonStr, _ := json.Marshal(values)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
