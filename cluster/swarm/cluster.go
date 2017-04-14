@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"net"
 	"encoding/json"
+	"math"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -238,16 +239,16 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		if cut {
 			switch requestClass {
 				case "2":
-					//config.HostConfig.CPUShares *= 0.8
-					//config.HostConfig.Memory *= 0.8
+					config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * 0.84))
+					config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) * 0.84))
 					break
 				case "3":
-					//config.HostConfig.CPUShares *= 0.6
-					//config.HostConfig.Memory *= 0.6
+					config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * 0.67))
+					config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) * 0.67))
 					break
 				case "4":
-					//config.HostConfig.CPUShares *= 0.5
-					//config.HostConfig.Memory *= 0.5
+					config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * 0.5))
+					config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) * 0.5))
 					break
 			}
 		}

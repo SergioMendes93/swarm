@@ -7,7 +7,6 @@ import (
 
 	"math"
 //	"os/exec"
-//	"math/rand"	
 	"net/http"	
 	"encoding/json"
 	"strconv"
@@ -48,13 +47,13 @@ var ipTaskRegistry = "146.193.41.143"
 //var ipAddress = getIPAddress()
 
 var MAX_OVERBOOKING_CLASS1 = 1.0
-var MAX_OVERBOOKING_CLASS2 = 1.2
-var MAX_OVERBOOKING_CLASS3 = 1.5
-var MAX_OVERBOOKING_CLASS4 = 2.0
+var MAX_OVERBOOKING_CLASS2 = 1.16
+var MAX_OVERBOOKING_CLASS3 = 1.33
+var MAX_OVERBOOKING_CLASS4 = 1.5
 
-var MAX_CUT_CLASS2 = 0.0
-var MAX_CUT_CLASS3 = 0.0
-var MAX_CUT_CLASS4 = 0.0
+var MAX_CUT_CLASS2 = 0.16
+var MAX_CUT_CLASS3 = 0.33
+var MAX_CUT_CLASS4 = 0.5
 
 // EnergyPlacementStrategy randomly places the container into the cluster.
 type EnergyPlacementStrategy struct {
@@ -69,31 +68,11 @@ func (p *EnergyPlacementStrategy) Initialize() error {
 func (p *EnergyPlacementStrategy) Name() string {
 	return "energy"
 }
-/*
-func findNode(host *Host, nodes []*node.Node) ([]*node.Node) {
-	output := make([]*node.Node,0)
-
-	//going to choose a worker randomly from the host
-	numWorkers := len(host.WorkerNodes)
-	
-	seed := rand.NewSource(time.Now().UnixNano())
-	r1 := rand.New(seed)
-	randomNumber := r1.Intn(numWorkers)		
-		
-	if randomNumber != 0 {
-		randomNumber = randomNumber - 1
-	}
-
-	output = append(output, host.WorkerNodes[randomNumber])
-	
-	return output
-}
-*/
 func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedMemory float64, requestCPUs float64, requestMemory float64) bool {
 	//Lets get the new overbooking factor after the request is allocated  (worst case estimation because we assume that they are going to use all the resources)
 	overbookingMemory := (hostAllocatedMemory + requestMemory)/host.TotalMemory
 	overbookingCPUs := 	(hostAllocatedCPUs + requestCPUs)/host.TotalCPUs
-
+	
 	newOverbooking := math.Max(overbookingMemory,overbookingCPUs)
 	switch host.HostClass {
 		case "1":
@@ -125,15 +104,18 @@ func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedM
 func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, bool) {
 
 //	ipHostRegistry = getIPAddress()
-	/*cmd := "docker"
-	args := []string{"run", "-itd", "-c", "30", "-m", "500m", "-e", "affinity:requestclass==4", "--name", "lala1", "ubuntu"}
+//	cmd := "docker"
+/*	args := []string{"-H", "tcp://0.0.0.0:3375", "run", "-itd", "-c", "30", "-m", "500m", "-e", "affinity:requestclass==4", "--name", "lala1", "ubuntu"}
 
 	if err := exec.Command(cmd, args...).Run(); err != nil {
 		fmt.Println("Error using docker run")
 		fmt.Println(err)
-	}*/
-
+	}
+*/
+	
 	ipHostRegistry = "146.193.41.142"
+	go UpdateTask("http://"+ipHostRegistry+":12345/host/reschedule/30&500m&4&ubuntu")	
+
 	output := make([]*node.Node,0)
 
 	affinities, err := filter.ParseExprs(config.Affinities())
@@ -165,7 +147,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		//if it does no go over it, then the request can be scheduled to this host
 		host := listHostsLEE_DEE[i]
 		fmt.Println(host)
-		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.Memory), float64(config.HostConfig.CPUShares)) {
+		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory)) {
 			//return findNode(host,nodes), nil, requestClass, requestType, false
 			output = append(output, host.WorkerNodes[0])
 			return output, nil, requestClass, requestType, false
@@ -175,7 +157,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 //------------------------ Cut algorithm ------------------------
 
 	//obtemos a nova listHostsLEE_DEE, desta vez ordenada de forma diferente	
-	listHostsLEE_DEE = GetHosts("http://ipHostRegistry:12345/host/list/"+requestClass+"&2")
+	listHostsLEE_DEE = GetHosts("http://"+ipHostRegistry+":12345/host/list/"+requestClass+"&2")
 	
 	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable { //if true then it means that we have a host that it can be scheduled	
