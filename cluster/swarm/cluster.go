@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"net"
 	"encoding/json"
-	"math"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -239,8 +238,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	if strategy == "energy" {
 		//if this condition is true then we must apply a cut to the request in order to fit it 
 		if cut != 0.0 {
-				config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * cut))
-				config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) *  cut))
+				config.HostConfig.CPUShares = int64(float64(config.HostConfig.CPUShares) * cut)
+				config.HostConfig.Memory = int64(float64(config.HostConfig.Memory) *  cut)
 				cutReceived = strconv.FormatFloat((1-cut),'f',-1,64)
 		}
 	}
@@ -258,8 +257,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	}
 
 	if strategy == "energy" {	
-		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
-		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
+		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,64)
+		taskMemory := strconv.FormatInt(config.HostConfig.Memory,64)
 
 
 		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, cutReceived )

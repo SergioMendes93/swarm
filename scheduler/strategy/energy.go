@@ -320,8 +320,8 @@ func cutRequests(cutList []Task, hostIP string) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		cpu := strconv.FormatFloat(math.Abs(newCPU), 'f', -1, 64)
-		memory := strconv.FormatFloat(math.Abs(newMemory), 'f', -1, 64)
+		cpu := strconv.FormatInt(int64(newCPU),64)
+		memory := strconv.FormatInt(int64(newMemory),64)
 	
 		//TODO: Para testes, isto depois é removido, no updatetask vai ser substituido pelo Up
 		cut := strconv.FormatFloat(amountToCut, 'f', -1, 64)
