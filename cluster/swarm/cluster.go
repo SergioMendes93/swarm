@@ -257,8 +257,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	}
 
 	if strategy == "energy" {	
-		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,64)
-		taskMemory := strconv.FormatInt(config.HostConfig.Memory,64)
+		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
+		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 
 
 		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, cutReceived )
