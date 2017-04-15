@@ -237,8 +237,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	if strategy == "energy" {
 		//if this condition is true then we must apply a cut to the request in order to fit it 
 		if cut != 0.0 {
-				config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * (1 - cut)))
-				config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) * (1 - cut)))
+				config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * cut))
+				config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) *  cut))
 		}
 	}
 
