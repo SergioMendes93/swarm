@@ -43,7 +43,6 @@ type Task struct {
 }
 
 var ipHostRegistry = ""
-var ipTaskRegistry = "146.193.41.143"
 //var ipAddress = getIPAddress()
 
 var MAX_OVERBOOKING_CLASS1 = 1.0
@@ -114,7 +113,6 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 */
 	
 	ipHostRegistry = "146.193.41.142"
-	go UpdateTask("http://"+ipHostRegistry+":12345/host/reschedule/30&500m&4&ubuntu")	
 
 	output := make([]*node.Node,0)
 
@@ -136,7 +134,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		return nil, err, "0", requestType, 0.0
 	}
 
-	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info.. //endereço do manager e port do host registry
+/*	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info.. //endereço do manager e port do host registry
 	listHostsLEE_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/list/"+requestClass+"&1")
 		
 	
@@ -153,20 +151,19 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 			return output, nil, requestClass, requestType, 0.0
 		}
 			
-	}
+	}*/
 //------------------------ Cut algorithm ------------------------
 
 	//obtemos a nova listHostsLEE_DEE, desta vez ordenada de forma diferente	
-	listHostsLEE_DEE = GetHosts("http://"+ipHostRegistry+":12345/host/list/"+requestClass+"&2")
-	
+	listHostsLEE_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/list/"+requestClass+"&2")
+	fmt.Println("Aqui 1")
+	fmt.Println(listHostsLEE_DEE)
 	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable { //if true then it means that we have a host that it can be scheduled	
 		//return findNode(host, nodes), nil, cut, requestType, true
 		output = append(output, host.WorkerNodes[0])
 		return output, nil, requestClass, requestType, cut
 	}
-
-	return nodes, nil, requestClass, requestType, 0.0
 
 //-------------------------Kill algorithm ----------------------------
 
@@ -191,12 +188,12 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 		host := listHostsEED_DEE[i] 
 
 		if requestClass == "4" && requestType == "job"{
-			possibleKillList = append(possibleKillList, GetTasks("http://"+ipTaskRegistry+":1234/task/class4")...)
+			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/class4")...)
 
 		} else if requestClass == "4" {
 			return nil, false
 		} else {
-			possibleKillList = append(possibleKillList, GetTasks("http://"+ipTaskRegistry+":1234/task/higher/" + requestClass)...)
+			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/higher/" + requestClass)...)
 		}
 
 		killList := make([]Task, 0)
@@ -209,7 +206,7 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 			}
 
 			if requestFitsAfterKills(killList, host, config) {
-				go killTasks(killList)
+				go killTasks(killList, host.HostIP)
 				go reschedule(killList)
 				return host, true
 			}
@@ -224,10 +221,10 @@ func reschedule(killList []Task) {
 	}
 }
 
-func killTasks(killList []Task) {
+func killTasks(killList []Task, hostIP string) {
 	for _, task := range killList {
 		go UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID)
-		go UpdateTask("http://"+ipTaskRegistry+":1234/task/remove/"+task.TaskID)
+		go UpdateTask("http://"+hostIP+":1234/task/remove/"+task.TaskID)
 	}
 }
 
@@ -259,13 +256,14 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		host := listHostsLEE_DEE[i]		
 
 		if host.HostClass >= requestClass && requestClass != "4" {
-			//listTasks = append(listTasks, GetTasks("http://" + host.HostIP + ":1234/task/highercut/" + requestClass)
-			listTasks = append(listTasks, GetTasks("http://"+ipTaskRegistry+":1234/task/highercut/" + requestClass)...)
+			fmt.Println("Entrou aqui")			
+			listTasks = append(listTasks, GetTasks("http://"+host.HostIP+":1234/task/highercut/" + requestClass)...)
+			fmt.Println(listTasks)
 		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
 			cutToReceive := amountToCut(requestClass, host.HostClass)
 			return host, true, cutToReceive	//cutToReceived indicates the cut to be received by this request, performed at /cluster/swarm/cluster.go
 		} else if requestClass != "1" {
-			listTasks = append(listTasks, GetTasks("http://"+ipTaskRegistry+":1234/task/equalhigher/" + requestClass+"&"+host.HostClass)...)
+			listTasks = append(listTasks, GetTasks("http://"+host.HostIP+":1234/task/equalhigher/" + requestClass+"&"+host.HostClass)...)
 		}
 		
 		newCPU := 0.0
@@ -283,6 +281,10 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			newMemory = float64(config.HostConfig.Memory)
 		}
 	
+		fmt.Println("new CPU and memory")
+		fmt.Println(newCPU)
+		fmt.Println(newMemory)
+
 		for _, task := range listTasks {
 			if task.TaskClass == "1" {
 				break
@@ -290,18 +292,23 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			cutList = append(cutList, task)
 			
 			if fitAfterCuts(requestClass, host, newMemory, newCPU, cutList) {
-				go cutRequests(cutList)
+				go cutRequests(cutList, host.HostIP)
 				cutToReceive := amountToCut(requestClass, host.HostClass)
 				return host, true, cutToReceive
 			}
 		}
-		//return host, false, requestClass 
+		//TODO DEPOIS TIRAR ESTE RETURN SO PARA TESTAR
+
+		fmt.Println("Cut to receive")
+		cutToReceive := amountToCut(requestClass, host.HostClass)
+		fmt.Println(cutToReceive)
+		return host, true, cutToReceive
 	}
 	//TODO: este return esta assim para efeitos de teste, depois repensar nisto
 	return listHostsLEE_DEE[0], false, 0.0
 }
 
-func cutRequests(cutList []Task) {
+func cutRequests(cutList []Task, hostIP string) {
 	for _, task := range cutList {
 		newCPU, err := strconv.ParseFloat(task.CPU, 64) 
 		newMemory, err := strconv.ParseFloat(task.Memory, 64) 
@@ -313,13 +320,13 @@ func cutRequests(cutList []Task) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		cpu := strconv.FormatFloat(newCPU, 'f', -1, 64)
-		memory := strconv.FormatFloat(newMemory, 'f', -1, 64)
+		cpu := strconv.FormatFloat(math.Abs(newCPU), 'f', -1, 64)
+		memory := strconv.FormatFloat(math.Abs(newMemory), 'f', -1, 64)
 	
 		//TODO: Para testes, isto depois é removido, no updatetask vai ser substituido pelo Up
 		cut := strconv.FormatFloat(amountToCut, 'f', -1, 64)
 
-		go UpdateTask("http://"+ipTaskRegistry+":1234/task/updatetask/"+task.TaskClass+"&"+cpu+"&"+memory+"&"+task.TaskID+"&"+cut)
+		go UpdateTask("http://"+hostIP+":1234/task/updatetask/"+task.TaskClass+"&"+cpu+"&"+memory+"&"+task.TaskID+"&"+cut)
 		go UpdateTask("http://"+ipHostRegistry+":12345/host/updatetask/"+task.TaskID+"&"+cpu+"&"+memory)
 	}
 }

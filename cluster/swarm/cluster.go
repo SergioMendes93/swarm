@@ -232,6 +232,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	}
 
 	c.scheduler.Unlock()
+	cutReceived := "0"
+
 
 	strategy := c.scheduler.Strategy()
 	if strategy == "energy" {
@@ -239,6 +241,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		if cut != 0.0 {
 				config.HostConfig.CPUShares = int64(math.Abs(float64(config.HostConfig.CPUShares) * cut))
 				config.HostConfig.Memory = int64(math.Abs(float64(config.HostConfig.Memory) *  cut))
+				cutReceived = strconv.FormatFloat((1-cut),'f',-1,64)
 		}
 	}
 
@@ -258,7 +261,6 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 
-		cutReceived := strconv.FormatFloat(cut,'f',-1,64)
 
 		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, cutReceived )
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateclass/"+requestClass+"&"+ n.IP)
