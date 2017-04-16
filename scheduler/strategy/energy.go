@@ -151,25 +151,24 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 			return output, nil, requestClass, requestType, 0.0
 		}
 			
-	}*/
+	}
 //------------------------ Cut algorithm ------------------------
 
 	//obtemos a nova listHostsLEE_DEE, desta vez ordenada de forma diferente	
 	listHostsLEE_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/list/"+requestClass+"&2")
-	fmt.Println("Aqui 1")
-	fmt.Println(listHostsLEE_DEE)
+
 	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable { //if true then it means that we have a host that it can be scheduled	
 		//return findNode(host, nodes), nil, cut, requestType, true
 		output = append(output, host.WorkerNodes[0])
 		return output, nil, requestClass, requestType, cut
 	}
-
+*/
 //-------------------------Kill algorithm ----------------------------
 
 	listHostsEED_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/listkill/"+requestClass)
 
-	host, allocable = kill(listHostsEED_DEE, requestClass, requestType, config)
+	host, allocable := kill(listHostsEED_DEE, requestClass, requestType, config)
 	
 	if allocable {
 		//return findNode(host,nodes), nil, requestClass, requestType,  false
@@ -223,7 +222,8 @@ func reschedule(killList []Task) {
 
 func killTasks(killList []Task, hostIP string) {
 	for _, task := range killList {
-		go UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID)
+		//this besides killing the task it will also update the allocated cpu/memory  
+		go UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID+"&"+task.CPU+"&"+task.Memory+"&"+hostIP)
 		go UpdateTask("http://"+hostIP+":1234/task/remove/"+task.TaskID)
 	}
 }
@@ -281,10 +281,6 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			newMemory = float64(config.HostConfig.Memory)
 		}
 	
-		fmt.Println("new CPU and memory")
-		fmt.Println(newCPU)
-		fmt.Println(newMemory)
-
 		for _, task := range listTasks {
 			if task.TaskClass == "1" {
 				break
@@ -297,12 +293,6 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 				return host, true, cutToReceive
 			}
 		}
-		//TODO DEPOIS TIRAR ESTE RETURN SO PARA TESTAR
-
-		fmt.Println("Cut to receive")
-		cutToReceive := amountToCut(requestClass, host.HostClass)
-		fmt.Println(cutToReceive)
-		return host, true, cutToReceive
 	}
 	//TODO: este return esta assim para efeitos de teste, depois repensar nisto
 	return listHostsLEE_DEE[0], false, 0.0
@@ -310,24 +300,27 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 
 func cutRequests(cutList []Task, hostIP string) {
 	for _, task := range cutList {
-		newCPU, err := strconv.ParseFloat(task.CPU, 64) 
-		newMemory, err := strconv.ParseFloat(task.Memory, 64) 
-		amountToCut, err := strconv.ParseFloat(task.CutToReceive,64)
+		currentCPU, _ := strconv.ParseFloat(task.CPU, 64) 
+		currentMemory, _ := strconv.ParseFloat(task.Memory, 64) 
+		amountToCut, _ := strconv.ParseFloat(task.CutToReceive,64)
 
-		newCPU *= (1 - amountToCut)
-		newMemory *= (1 - amountToCut)
+		newCPU := currentCPU * (1 - amountToCut)
+		newMemory := currentMemory * (1 - amountToCut)
 
-		if err != nil {
-			fmt.Println(err)
-		}
+		//these two will be used to update the amount of allocated cpu and memory for this host at the host registry
+		cpuCutPerform := currentCPU - newCPU 
+		memoryCutPerform := currentMemory - newMemory
+
 		cpu := strconv.FormatInt(int64(newCPU),10)
 		memory := strconv.FormatInt(int64(newMemory),10)
 	
 		//TODO: Para testes, isto depois é removido, no updatetask vai ser substituido pelo Up
 		cut := strconv.FormatFloat(amountToCut, 'f', -1, 64)
+		cpuCutPerformed := strconv.FormatFloat(cpuCutPerform, 'f',-1,64)
+		memoryCutPerformed := strconv.FormatFloat(memoryCutPerform, 'f',-1,64)
 
 		go UpdateTask("http://"+hostIP+":1234/task/updatetask/"+task.TaskClass+"&"+cpu+"&"+memory+"&"+task.TaskID+"&"+cut)
-		go UpdateTask("http://"+ipHostRegistry+":12345/host/updatetask/"+task.TaskID+"&"+cpu+"&"+memory)
+		go UpdateTask("http://"+ipHostRegistry+":12345/host/updatetask/"+task.TaskID+"&"+cpu+"&"+memory+"&"+hostIP+"&"+cpuCutPerformed+"&"+memoryCutPerformed)
 	}
 }
 
