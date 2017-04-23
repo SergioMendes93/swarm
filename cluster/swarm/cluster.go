@@ -32,7 +32,6 @@ import (
 	"github.com/samalba/dockerclient"
 )
 
-var ipTaskRegistry = "146.193.41.143"
 
 type pendingContainer struct {
 	Config *cluster.ContainerConfig
@@ -261,10 +260,10 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 
 
-		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, cutReceived )
+		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, cutReceived, n.IP )
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateclass/"+requestClass+"&"+ n.IP)
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/"+n.IP+"&"+taskCPU+"&"+taskMemory+"&"+container.ID)
-		go SendInfoMonitor(container.ID)
+		go SendInfoMonitor(container.ID, n.IP)
 	}
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
@@ -274,8 +273,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 }
 
 //send task ID to monitor so it nows what to monitor
-func SendInfoMonitor(containerID string) {
-	url := "http://"+ipTaskRegistry+":8080/newtask/?id="+containerID
+func SendInfoMonitor(containerID string, hostIP string) {
+	url := "http://"+hostIP+":8080/newtask/?id="+containerID
 	req, err := http.NewRequest("GET", url, nil)
     req.Header.Set("X-Custom-Header", "myvalue")
     req.Header.Set("Content-Type", "application/json")
@@ -292,9 +291,9 @@ func SendInfoMonitor(containerID string) {
 
 
 //used to send updates to task registry
-func SendInfoTask(containerID string, requestClass string, taskCPU string, image string, taskMemory string, requestType string, cutReceived string) {
+func SendInfoTask(containerID string, requestClass string, taskCPU string, image string, taskMemory string, requestType string, cutReceived string, hostIP string) {
 	//Update Task Registry with the task that was just created
-	url := "http://"+ipTaskRegistry+":1234/task/"+requestClass
+	url := "http://"+hostIP+":1234/task/"+requestClass
 	values := map[string]string{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
 									"Memory": taskMemory, "TaskType": requestType, "CutReceived": cutReceived}  
 	jsonStr, _ := json.Marshal(values)

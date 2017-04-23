@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"strconv"
 	"fmt"
-	"net"
 )
 
 type Host struct {
@@ -103,15 +102,7 @@ func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedM
 func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, float64) {
 
 //	ipHostRegistry = getIPAddress()
-//	cmd := "docker"
-/*	args := []string{"-H", "tcp://0.0.0.0:3375", "run", "-itd", "-c", "30", "-m", "500m", "-e", "affinity:requestclass==4", "--name", "lala1", "ubuntu"}
 
-	if err := exec.Command(cmd, args...).Run(); err != nil {
-		fmt.Println("Error using docker run")
-		fmt.Println(err)
-	}
-*/
-	
 	ipHostRegistry = "146.193.41.142"
 
 	output := make([]*node.Node,0)
@@ -134,7 +125,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		return nil, err, "0", requestType, 0.0
 	}
 
-/*	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info.. //endereço do manager e port do host registry
+	//+1 is the list type go get +2 is the other list type //see hostregistry.go for +info.. //endereço do manager e port do host registry
 	listHostsLEE_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/list/"+requestClass+"&1")
 		
 	
@@ -144,7 +135,6 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		//we must check if after allocating this request the overbooking factor of the host doesnt go over the host maximum overbooking allowed
 		//if it does no go over it, then the request can be scheduled to this host
 		host := listHostsLEE_DEE[i]
-		fmt.Println(host)
 		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory)) {
 			//return findNode(host,nodes), nil, requestClass, requestType, false
 			output = append(output, host.WorkerNodes[0])
@@ -155,7 +145,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 //------------------------ Cut algorithm ------------------------
 
 	//obtemos a nova listHostsLEE_DEE, desta vez ordenada de forma diferente	
-	listHostsLEE_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/list/"+requestClass+"&2")
+	listHostsLEE_DEE = GetHosts("http://"+ipHostRegistry+":12345/host/list/"+requestClass+"&2")
 
 	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable { //if true then it means that we have a host that it can be scheduled	
@@ -163,19 +153,19 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		output = append(output, host.WorkerNodes[0])
 		return output, nil, requestClass, requestType, cut
 	}
-*/
+
 //-------------------------Kill algorithm ----------------------------
 
 	listHostsEED_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/listkill/"+requestClass)
 
-	host, allocable := kill(listHostsEED_DEE, requestClass, requestType, config)
+	host, allocable = kill(listHostsEED_DEE, requestClass, requestType, config)
 	
 	if allocable {
 		//return findNode(host,nodes), nil, requestClass, requestType,  false
 		output = append(output, host.WorkerNodes[0])
 		return output, nil, requestClass, requestType,  0.0
 	}
-
+	fmt.Println("Not allocable")
 //	return nodes, nil, requestClass, requestType, false
 	return nil, nil, requestClass, requestType, 0.0 //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
 }
@@ -207,11 +197,15 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 			if requestFitsAfterKills(killList, host, config) {
 				go killTasks(killList, host.HostIP)
 				go reschedule(killList)
+				fmt.Println("Sucessfully killed")
 				return host, true
 			}
 		}
 	}
-	return nil, false //em definitivo sera nil,false
+	fmt.Println("No kill")
+	//TODO TIRAR ISTO E DEIXAR O RETURN QUE ESTA COMENTADO
+	return listHostsEED_DEE[0], true //em definitivo sera nil,false
+//	return nil, false //em definitivo sera nil,false
 }
 
 func reschedule(killList []Task) {
@@ -492,17 +486,3 @@ func GetHosts(url string) ([]*Host) {
 	return listHosts
 }
 
-func getIPAddress() string {
-    addrs, err := net.InterfaceAddrs()
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-    for _, a := range addrs {
-        if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-            if ipnet.IP.To4() != nil {
-                return ipnet.IP.String()
-            }
-        }
-    }
-    return ""
-}
