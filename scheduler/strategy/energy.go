@@ -66,13 +66,20 @@ func (p *EnergyPlacementStrategy) Initialize() error {
 func (p *EnergyPlacementStrategy) Name() string {
 	return "energy"
 }
-func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedMemory float64, requestCPUs float64, requestMemory float64) bool {
+//this hostClass can be current class or the future class the host will. Ex: if the incoming request is 3 and the host class is 4, then hostClass must be 3 instead of to 
+//account the new overbooking factor oh the host
+func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedMemory float64, requestCPUs float64, requestMemory float64, hostClass string) bool {
 	//Lets get the new overbooking factor after the request is allocated  (worst case estimation because we assume that they are going to use all the resources)
 	overbookingMemory := (hostAllocatedMemory + requestMemory)/host.TotalMemory
 	overbookingCPUs := 	(hostAllocatedCPUs + requestCPUs)/host.TotalCPUs
 	
 	newOverbooking := math.Max(overbookingMemory,overbookingCPUs)
-	switch host.HostClass {
+	fmt.Print("Current overbooking ")
+	fmt.Println(host.OverbookingFactor)
+	fmt.Print("New overbooking ")
+	fmt.Println(newOverbooking)
+
+	switch hostClass {
 		case "1":
 			if newOverbooking < MAX_OVERBOOKING_CLASS1 {
 				return true
@@ -135,7 +142,11 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		//we must check if after allocating this request the overbooking factor of the host doesnt go over the host maximum overbooking allowed
 		//if it does no go over it, then the request can be scheduled to this host
 		host := listHostsLEE_DEE[i]
-		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory)) {
+		hostClassForOverbooking := host.HostClass
+		if requestClass < hostClassForOverbooking {
+			hostClassForOverbooking = requestClass
+		}
+		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory), hostClassForOverbooking) {
 			//return findNode(host,nodes), nil, requestClass, requestType, false
 			output = append(output, host.WorkerNodes[0])
 			return output, nil, requestClass, requestType, 0.0
@@ -171,9 +182,12 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 
 func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, config *cluster.ContainerConfig) (*Host, bool) {
+	fmt.Println("KILL algoritmo")
+
 	for i := 0 ; i < len(listHostsEED_DEE); i++ {
 		possibleKillList := make([]Task, 0)
 		host := listHostsEED_DEE[i] 
+		fmt.Println("Attempting to kill at host " + host.HostIP)
 
 		if requestClass == "4" && requestType == "job"{
 			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/class4")...)
@@ -184,6 +198,9 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/higher/" + requestClass)...)
 		}
 
+		fmt.Println("Possible kill list")
+		fmt.Println(possibleKillList)
+	
 		killList := make([]Task, 0)
 		for _, task := range possibleKillList {
 			
@@ -193,7 +210,10 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 				killList = append(killList, task)
 			}
 
-			if requestFitsAfterKills(killList, host, config) {
+			if requestFitsAfterKills(killList, host, config, requestClass) {
+				fmt.Println("FITS!")
+				fmt.Println("killing ")
+				fmt.Println(killList)
 				go killTasks(killList, host.HostIP)
 				go reschedule(killList)
 				return host, true
@@ -217,9 +237,11 @@ func killTasks(killList []Task, hostIP string) {
 	}
 }
 
-func requestFitsAfterKills(killList []Task, host *Host, config *cluster.ContainerConfig) (bool) {
+func requestFitsAfterKills(killList []Task, host *Host, config *cluster.ContainerConfig, requestClass string) (bool) {
 	cpuReduction := 0.0
 	memoryReduction := 0.0
+
+	fmt.Println("Checking if fits after kills")
 	
 	for _, task := range killList {
 		taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
@@ -228,12 +250,26 @@ func requestFitsAfterKills(killList []Task, host *Host, config *cluster.Containe
 		memoryReduction +=  taskMemory
 	}
 
+	fmt.Print("CPU reduction ")
+	fmt.Print(cpuReduction)
+	fmt.Print(" memory reduction ")
+	fmt.Println(memoryReduction)
+
 	//after killing the tasks, the host will have the following memory and cpu
 	hostMemory := host.AllocatedMemory - memoryReduction
 	hostCPU := host.AllocatedCPUs - cpuReduction
 
+	fmt.Print("Host available memory ") 
+	fmt.Print(hostMemory)
+	fmt.Print(" Host available CPU ")
+	fmt.Println(hostCPU)
+
 	//lets see if after those kill the request will now fit
-	return CheckOverbookingLimit(host, hostCPU, hostMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory))	
+	hostClassForOverbooking := host.HostClass
+        if requestClass < hostClassForOverbooking {
+        	hostClassForOverbooking = requestClass
+        }
+	return CheckOverbookingLimit(host, hostCPU, hostMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory), hostClassForOverbooking)	
 }
 
 func fitsWithoutCuts(host *Host, config *cluster.ContainerConfig) bool {
@@ -251,11 +287,15 @@ func fitsWithoutCuts(host *Host, config *cluster.ContainerConfig) bool {
 
 func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool, float64) {
 		
+	fmt.Println("Cut algorithm")
+
 	for i := 0; i < len(listHostsLEE_DEE); i++ {
 		cutList := make([]Task,0)
-		listTasks := make([]Task,0)
+		listTasks := make([]Task,0)		
 
-		host := listHostsLEE_DEE[i]		
+		host := listHostsLEE_DEE[i]
+		
+		fmt.Println("Attempting to cut at " + host.HostIP)
 
 		//first we check if the request fits on this host without resorting to cuts. This avoid cutting unnecessary tasks
 		if fitsWithoutCuts(host, config) {
@@ -275,6 +315,9 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		newMemory := 0.0
 		canCut := false
 		
+		fmt.Println("Task that will be attempted to cut")
+		fmt.Println(listTasks)
+
 		if requestClass != "1" {
 			newMemory,newCPU,canCut = applyCut(requestClass, config, host.HostClass)
 			if !canCut { //if we cannot cut the request we use the original memory and cpu values
@@ -294,6 +337,8 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			
 			if fitAfterCuts(requestClass, host, newMemory, newCPU, cutList) {
 				go cutRequests(cutList, host.HostIP)
+				fmt.Println("Cutting these tasks")
+				fmt.Println(cutList)
 				cutToReceive := amountToCut(requestClass, host.HostClass)
 				return host, true, cutToReceive
 			}
@@ -318,7 +363,6 @@ func cutRequests(cutList []Task, hostIP string) {
 		cpu := strconv.FormatInt(int64(newCPU),10)
 		memory := strconv.FormatInt(int64(newMemory),10)
 	
-		//TODO: Para testes, isto depois é removido, no updatetask vai ser substituido pelo Up
 		cut := strconv.FormatFloat(amountToCut, 'f', -1, 64)
 		cpuCutPerformed := strconv.FormatFloat(cpuCutPerform, 'f',-1,64)
 		memoryCutPerformed := strconv.FormatFloat(memoryCutPerform, 'f',-1,64)
@@ -349,18 +393,32 @@ func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, 
 	
 	for _, task := range cutList {
 		cut,_ := strconv.ParseFloat(task.CutToReceive, 64)
+
+		fmt.Println("FIT after cuts")
+		fmt.Print(" cut to receive ")	
+		fmt.Println( cut)		
+
 		taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
 		taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
 		cpuReduction += taskCPU * cut
 		memoryReduction +=  taskMemory * cut
+
+		fmt.Print("CPU reduction " )
+		fmt.Print(cpuReduction)
+		fmt.Print( " memory reduction ")
+		fmt.Println(memoryReduction)
 	}
 
 	//after cutting the tasks, the host will have the following memory and cpu
 	hostMemory := host.AllocatedMemory - memoryReduction
 	hostCPU := host.AllocatedCPUs - cpuReduction
 	
+	hostClassForOverbooking := host.HostClass
+        if requestClass < hostClassForOverbooking {
+        	hostClassForOverbooking = requestClass
+        }
 	//lets see if after those cuts the request will now fit
-	return CheckOverbookingLimit(host, hostCPU, hostMemory, cpu, memory)
+	return CheckOverbookingLimit(host, hostCPU, hostMemory, cpu, memory, hostClassForOverbooking)
 }
 
 func amountToCut(requestClass string, hostClass string) (float64) {
@@ -454,7 +512,12 @@ func afterCutRequestFits(requestClass string, host *Host, config *cluster.Contai
 	if !canCut {
 		return false
 	}
-	return CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, newCPU, newMemory)	
+
+	hostClassForOverbooking := host.HostClass
+        if requestClass < hostClassForOverbooking {
+        	hostClassForOverbooking = requestClass
+        }
+	return CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, newCPU, newMemory, hostClassForOverbooking)	
 }
 
 func GetTasks(url string) ([]Task) {
