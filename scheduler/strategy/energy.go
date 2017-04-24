@@ -15,12 +15,12 @@ import (
 
 type Host struct {
     	HostIP                    string       `json:"hostip, omitempty"`
-    	WorkerNodes               []*node.Node    `json:"workernode,omitempty"`
+    	WorkerNodes               []*node.Node `json:"workernode,omitempty"`
     	HostClass                 string       `json:"hostclass,omitempty"`
     	Region                    string       `json:"region,omitempty"`
-    	TotalResourcesUtilization string       `json:"totalresouces,omitempty"`
-    	CPU_Utilization           string       `json:"cpu,omitempty"`
-    	MemoryUtilization         string       `json:"memory,omitempty"`
+    	TotalResourcesUtilization float64      `json:"totalresouces,omitempty"`
+    	CPU_Utilization           float64      `json:"cpu,omitempty"`
+    	MemoryUtilization         float64      `json:"memory,omitempty"`
     	AllocatedMemory           float64      `json:"allocatedmemory,omitempty"`
     	AllocatedCPUs             float64      `json:"allocatedcpus,omitempty"`
     	OverbookingFactor         float64      `json:"overbookingfactor,omitempty"`
@@ -30,15 +30,17 @@ type Host struct {
 }
 
 type Task struct {
-    	TaskID string           `json:"taskid,omitempty"`
-	TaskClass string	`json:"taskclass,omitempty"`
-	Image string		`json:"image,omitempty"`
-	CPU string		`json:"cpu,omitempty"`
-	TotalResources string	`json:"totalresources,omitempty"`
-	Memory string		`json:"memory,omitempty"`
-    	TaskType string         `json:"tasktype,omitempty"`
-    	CutReceived string      `json:"cutreceived,omitempty"`
-	CutToReceive string	`json:"cuttoreceive,omitempty"`
+    TaskID string           			`json:"taskid,omitempty"`
+	TaskClass string					`json:"taskclass,omitempty"`
+	Image string						`json:"image,omitempty"`
+	CPU float64							`json:"cpu,omitempty"`
+	TotalResourcesUtilization float64	`json:"totalresources,omitempty"`
+	Memory float64						`json:"memory,omitempty"`
+    CPUUtilization float64				`json:"cpuutilization,omitempty"`
+	MemoryUtilization float64			`json:"memoryutilization, omitempty"`
+	TaskType string         			`json:"tasktype,omitempty"`
+    CutReceived float64     			`json:"cutreceived,omitempty"`
+	CutToReceive float64				`json:"cuttoreceive,omitempty"`
 }
 
 var ipHostRegistry = ""
@@ -225,14 +227,19 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 
 func reschedule(killList []Task) {
 	for _, task := range killList {
-		go UpdateTask("http://"+ipHostRegistry+":12345/host/reschedule/"+task.CPU+"&"+task.Memory+"&"+task.TaskClass+"&"+task.Image)
+		cpu := strconv.FormatFloat(task.CPU,'f',-1,64)
+		memory := strconv.FormatFloat(task.Memory,'f',-1,64)
+		go UpdateTask("http://"+ipHostRegistry+":12345/host/reschedule/"+cpu+"&"+memory+"&"+task.TaskClass+"&"+task.Image)
 	}
 }
 
 func killTasks(killList []Task, hostIP string) {
 	for _, task := range killList {
+		cpu := strconv.FormatFloat(task.CPU,'f',-1,64)
+		memory := strconv.FormatFloat(task.Memory,'f',-1,64)
+
 		//this besides killing the task it will also update the allocated cpu/memory  
-		go UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID+"&"+task.CPU+"&"+task.Memory+"&"+hostIP)
+		go UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID+"&"+cpu+"&"+memory+"&"+hostIP)
 		go UpdateTask("http://"+hostIP+":1234/task/remove/"+task.TaskID)
 	}
 }
@@ -244,10 +251,8 @@ func requestFitsAfterKills(killList []Task, host *Host, config *cluster.Containe
 	fmt.Println("Checking if fits after kills")
 	
 	for _, task := range killList {
-		taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
-		taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
-		cpuReduction += taskCPU 
-		memoryReduction +=  taskMemory
+		cpuReduction += task.CPU 
+		memoryReduction +=  task.Memory
 	}
 
 	fmt.Print("CPU reduction ")
@@ -349,16 +354,14 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 
 func cutRequests(cutList []Task, hostIP string) {
 	for _, task := range cutList {
-		currentCPU, _ := strconv.ParseFloat(task.CPU, 64) 
-		currentMemory, _ := strconv.ParseFloat(task.Memory, 64) 
-		amountToCut, _ := strconv.ParseFloat(task.CutToReceive,64)
+		amountToCut := task.CutToReceive
 
-		newCPU := currentCPU * (1 - amountToCut)
-		newMemory := currentMemory * (1 - amountToCut)
+		newCPU := task.CPU * (1 - task.CutToReceive)
+		newMemory := task.Memory * (1 - task.CutToReceive)
 
 		//these two will be used to update the amount of allocated cpu and memory for this host at the host registry
-		cpuCutPerform := currentCPU - newCPU 
-		memoryCutPerform := currentMemory - newMemory
+		cpuCutPerform := task.CPU - newCPU 
+		memoryCutPerform := task.Memory - newMemory
 
 		cpu := strconv.FormatInt(int64(newCPU),10)
 		memory := strconv.FormatInt(int64(newMemory),10)
@@ -392,16 +395,13 @@ func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, 
 	memoryReduction := 0.0
 	
 	for _, task := range cutList {
-		cut,_ := strconv.ParseFloat(task.CutToReceive, 64)
 
 		fmt.Println("FIT after cuts")
 		fmt.Print(" cut to receive ")	
-		fmt.Println( cut)		
+		fmt.Println(task.CutToReceive)		
 
-		taskCPU, _ := strconv.ParseFloat(task.CPU, 64)
-		taskMemory, _ := strconv.ParseFloat(task.Memory, 64)
-		cpuReduction += taskCPU * cut
-		memoryReduction +=  taskMemory * cut
+		cpuReduction += task.CPU * task.CutToReceive
+		memoryReduction +=  task.Memory * task.CutToReceive
 
 		fmt.Print("CPU reduction " )
 		fmt.Print(cpuReduction)
