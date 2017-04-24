@@ -236,6 +236,19 @@ func requestFitsAfterKills(killList []Task, host *Host, config *cluster.Containe
 	return CheckOverbookingLimit(host, hostCPU, hostMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory))	
 }
 
+func fitsWithoutCuts(host *Host, config *cluster.ContainerConfig) bool {
+
+	hostFreeCPU := host.TotalCPUs - host.AllocatedCPUs
+	hostFreeMemory := host.TotalMemory - host.AllocatedMemory
+
+	if hostFreeCPU > float64(config.HostConfig.CPUShares) && hostFreeMemory > float64(config.HostConfig.Memory) {
+		return true
+	} else {
+		return false
+	}
+
+}
+
 func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool, float64) {
 		
 	for i := 0; i < len(listHostsLEE_DEE); i++ {
@@ -243,6 +256,11 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		listTasks := make([]Task,0)
 
 		host := listHostsLEE_DEE[i]		
+
+		//first we check if the request fits on this host without resorting to cuts. This avoid cutting unnecessary tasks
+		if fitsWithoutCuts(host, config) {
+			return host, true, 0.0
+		}
 
 		if host.HostClass >= requestClass && requestClass != "4" {
 			listTasks = append(listTasks, GetTasks("http://"+host.HostIP+":1234/task/highercut/" + requestClass)...)
