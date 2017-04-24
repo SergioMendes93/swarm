@@ -6,7 +6,7 @@ import (
 	"github.com/docker/swarm/scheduler/filter"
 
 	"math"
-//	"os/exec"
+	"errors"
 	"net/http"	
 	"encoding/json"
 	"strconv"
@@ -166,8 +166,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		return output, nil, requestClass, requestType,  0.0
 	}
 	fmt.Println("Not allocable")
-//	return nodes, nil, requestClass, requestType, false
-	return nil, nil, requestClass, requestType, 0.0 //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
+	return nil, errors.New("Does not fit on current hosts"), requestClass, requestType, 0.0 //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
 }
 
 
@@ -197,15 +196,11 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 			if requestFitsAfterKills(killList, host, config) {
 				go killTasks(killList, host.HostIP)
 				go reschedule(killList)
-				fmt.Println("Sucessfully killed")
 				return host, true
 			}
 		}
 	}
-	fmt.Println("No kill")
-	//TODO TIRAR ISTO E DEIXAR O RETURN QUE ESTA COMENTADO
-	return listHostsEED_DEE[0], true //em definitivo sera nil,false
-//	return nil, false //em definitivo sera nil,false
+	return nil, false //em definitivo sera nil,false
 }
 
 func reschedule(killList []Task) {
@@ -250,9 +245,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		host := listHostsLEE_DEE[i]		
 
 		if host.HostClass >= requestClass && requestClass != "4" {
-			fmt.Println("Entrou aqui")			
 			listTasks = append(listTasks, GetTasks("http://"+host.HostIP+":1234/task/highercut/" + requestClass)...)
-			fmt.Println(listTasks)
 		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
 			cutToReceive := amountToCut(requestClass, host.HostClass)
 			return host, true, cutToReceive	//cutToReceived indicates the cut to be received by this request, performed at /cluster/swarm/cluster.go
@@ -288,8 +281,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			}
 		}
 	}
-	//TODO: este return esta assim para efeitos de teste, depois repensar nisto
-	return listHostsLEE_DEE[0], false, 0.0
+	return nil, false, 0.0
 }
 
 func cutRequests(cutList []Task, hostIP string) {

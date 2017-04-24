@@ -255,7 +255,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).Debugf("Scheduling container %s to ", containerFlag)
 	}
 
-	if strategy == "energy" {	
+	if strategy == "energy"{	
 		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 
