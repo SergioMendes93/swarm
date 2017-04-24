@@ -397,6 +397,7 @@ func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, 
 	for _, task := range cutList {
 
 		fmt.Println("FIT after cuts")
+		fmt.Println(task)
 		fmt.Print(" cut to receive ")	
 		fmt.Println(task.CutToReceive)		
 

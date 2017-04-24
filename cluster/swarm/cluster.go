@@ -230,7 +230,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	}
 
 	c.scheduler.Unlock()
-	cutReceived := "0"
+	cutReceived := 0.0
 
 
 	strategy := c.scheduler.Strategy()
@@ -239,7 +239,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		if cut != 0.0 {
 				config.HostConfig.CPUShares = int64(float64(config.HostConfig.CPUShares) * cut)
 				config.HostConfig.Memory = int64(float64(config.HostConfig.Memory) *  cut)
-				cutReceived = strconv.FormatFloat((1-cut),'f',-1,64)
+				cutReceived = 1 - cut
 		}
 	}
 
@@ -260,7 +260,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 
 
-		go SendInfoTask(container.ID, requestClass, taskCPU, config.Image, taskMemory, requestType, cutReceived, n.IP )
+		go SendInfoTask(container.ID, requestClass, float64(config.HostConfig.CPUShares), config.Image, float64(config.HostConfig.Memory), requestType, cutReceived, n.IP )
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateclass/"+requestClass+"&"+ n.IP)
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/"+n.IP+"&"+taskCPU+"&"+taskMemory+"&"+container.ID)
 		go SendInfoMonitor(container.ID, n.IP)
@@ -291,10 +291,10 @@ func SendInfoMonitor(containerID string, hostIP string) {
 
 
 //used to send updates to task registry
-func SendInfoTask(containerID string, requestClass string, taskCPU string, image string, taskMemory string, requestType string, cutReceived string, hostIP string) {
+func SendInfoTask(containerID string, requestClass string, taskCPU float64, image string, taskMemory float64, requestType string, cutReceived float64, hostIP string) {
 	//Update Task Registry with the task that was just created
 	url := "http://"+hostIP+":1234/task/"+requestClass
-	values := map[string]string{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
+	values := map[string]interface{}{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
 									"Memory": taskMemory, "TaskType": requestType, "CutReceived": cutReceived}  
 	jsonStr, _ := json.Marshal(values)
 
