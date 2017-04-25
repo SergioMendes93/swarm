@@ -240,7 +240,6 @@ func killTasks(killList []Task, hostIP string) {
 
 		//this besides killing the task it will also update the allocated cpu/memory  
 		go UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID+"&"+cpu+"&"+memory+"&"+hostIP)
-		go UpdateTask("http://"+hostIP+":1234/task/remove/"+task.TaskID)
 	}
 }
 
