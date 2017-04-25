@@ -5,6 +5,7 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/scheduler/filter"
 
+	"bytes"
 	"math"
 	"errors"
 	"net/http"	
@@ -216,7 +217,7 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 				fmt.Println("FITS!")
 				fmt.Println("killing ")
 				fmt.Println(killList)
-				go killTasks(killList, host.HostIP)
+				//go killTasks(killList, host.HostIP)
 				go reschedule(killList)
 				return host, true
 			}
@@ -229,8 +230,26 @@ func reschedule(killList []Task) {
 	for _, task := range killList {
 		cpu := strconv.FormatFloat(task.CPU,'f',-1,64)
 		memory := strconv.FormatFloat(task.Memory,'f',-1,64)
-		go UpdateTask("http://"+ipHostRegistry+":12345/host/reschedule/"+cpu+"&"+memory+"&"+task.TaskClass+"&"+task.Image)
+		go reschedulingTasks(cpu, memory, task.TaskClass, task.Image)
 	}
+}
+
+func reschedulingTasks(cpu string, memory string, taskClass string, image string ) {
+	url := "http://"+ipHostRegistry+":12345/host/reschedule"
+	values := map[string]string{"CPU":cpu, "Memory": memory, "TaskClass":taskClass, "Image":image}
+
+	jsonStr, _ := json.Marshal(values)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("Content-Type", "application/json")
+		
+	client := &http.Client{}
+	resp, err := client.Do(req)
+		
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 }
 
 func killTasks(killList []Task, hostIP string) {
@@ -379,12 +398,16 @@ func UpdateTask (url string) {
 	req.Header.Set("X-Custom-Header", "myvalue")
 	req.Header.Set("Content-Type", "application/json")
 
+	fmt.Println("UpdateTask: " + url)
+
     	client := &http.Client{}
     	resp, err := client.Do(req)
     	if err != nil {
         	panic(err)
     	}
     	defer resp.Body.Close()
+
+	fmt.Println("Sent sucessfully")
 }
 
 //this function checks if after cutting the tasks and incoming request the request fits on this host
