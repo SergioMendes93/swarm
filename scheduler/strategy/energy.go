@@ -217,7 +217,7 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 				fmt.Println("FITS!")
 				fmt.Println("killing ")
 				fmt.Println(killList)
-				//go killTasks(killList, host.HostIP)
+				go killTasks(killList, host.HostIP)
 				go reschedule(killList)
 				return host, true
 			}
