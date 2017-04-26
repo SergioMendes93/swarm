@@ -22,7 +22,7 @@ func (p *BinpackPlacementStrategy) Name() string {
 }
 
 // RankAndSort sorts nodes based on the binpack strategy applied to the container config.
-func (p *BinpackPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, float64) {
+func (p *BinpackPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node, nodesMap map[string]*node.Node) ([]*node.Node, error, string, string, float64) {
 	// for binpack, a healthy node should increase its weight to increase its chance of being selected
 	// set healthFactor to 10 to make health degree [0, 100] overpower cpu + memory (each in range [0, 100])
 	const healthFactor int64 = 10

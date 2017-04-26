@@ -274,7 +274,8 @@ func (c *Cluster) CreateNetwork(name string, request *types.NetworkCreate) (*typ
 	}
 
 	c.scheduler.Lock()
-	nodes, err, _, _,_ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodesSlice, nodesMap := c.listNodes()
+	nodes, err, _, _,_ := c.scheduler.SelectNodesForContainer(nodesSlice, nodesMap, config)
 	c.scheduler.Unlock()
 	if err != nil {
 		return nil, err
@@ -414,9 +415,11 @@ func (c *Cluster) Volumes() cluster.Volumes {
 }
 
 // listNodes returns all the nodes in the cluster.
-func (c *Cluster) listNodes() []*node.Node {
+func (c *Cluster) listNodes() ([]*node.Node, map[string]*node.Node) {
 	c.RLock()
 	defer c.RUnlock()
+	
+	var nodesMap map[string]*node.Node = make(map[string]*node.Node)
 
 	out := []*node.Node{}
 	for _, s := range c.agents {
@@ -426,9 +429,11 @@ func (c *Cluster) listNodes() []*node.Node {
 		n.UsedCpus = 0
 		n.TotalMemory = int64(sumScalarResourceValue(s.offers, "mem")) * 1024 * 1024
 		n.UsedMemory = 0
+
+		nodesMap[n.IP] = n
 		out = append(out, n)
 	}
-	return out
+	return out, nodesMap
 }
 
 func (c *Cluster) listOffers() []*mesosproto.Offer {
@@ -525,8 +530,8 @@ func (c *Cluster) removeOffer(offer *mesosproto.Offer) bool {
 func (c *Cluster) LaunchTask(t *task.Task) bool {
 	c.scheduler.Lock()
 	//change to explicit lock defer c.scheduler.Unlock()
-
-	nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), t.GetConfig())
+	nodesSlice, nodesMap := c.listNodes()
+	nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(nodesSlice, nodesMap, t.GetConfig())
 	if err != nil {
 		c.scheduler.Unlock()
 		return false
@@ -639,8 +644,8 @@ func (c *Cluster) LaunchTask(t *task.Task) bool {
 func (c *Cluster) RANDOMENGINE() (*cluster.Engine, error) {
 	c.RLock()
 	defer c.RUnlock()
-
-	nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(c.listNodes(), &cluster.ContainerConfig{})
+	nodesSlice, nodesMap := c.listNodes()
+	nodes, err, _, _, _ := c.scheduler.SelectNodesForContainer(nodesSlice, nodesMap, &cluster.ContainerConfig{})
 	if err != nil {
 		return nil, err
 	}
@@ -661,7 +666,8 @@ func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuil
 			},
 		},
 	}
-	nodes, err, _, _,_ := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+	nodesSlice, nodesMap := c.listNodes()
+	nodes, err, _, _,_ := c.scheduler.SelectNodesForContainer(nodesSlice, nodesMap, config)
 	c.scheduler.Unlock()
 	if err != nil {
 		return err

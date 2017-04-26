@@ -16,7 +16,6 @@ import (
 
 type Host struct {
     	HostIP                    string       `json:"hostip, omitempty"`
-    	WorkerNodes               []*node.Node `json:"workernode,omitempty"`
     	HostClass                 string       `json:"hostclass,omitempty"`
     	Region                    string       `json:"region,omitempty"`
     	TotalResourcesUtilization float64      `json:"totalresouces,omitempty"`
@@ -109,7 +108,7 @@ func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedM
 }
 
 // RankAndSort randomly sorts the list of nodes.
-func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error, string, string, float64) {
+func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node, nodesMap map[string]*node.Node) ([]*node.Node, error, string, string, float64) {
 
 //	ipHostRegistry = getIPAddress()
 
@@ -151,7 +150,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		}
 		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory), hostClassForOverbooking) {
 			//return findNode(host,nodes), nil, requestClass, requestType, false
-			output = append(output, host.WorkerNodes[0])
+			output = append(output, nodesMap[host.HostIP])
 			return output, nil, requestClass, requestType, 0.0
 		}
 			
@@ -164,7 +163,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable { //if true then it means that we have a host that it can be scheduled	
 		//return findNode(host, nodes), nil, cut, requestType, true
-		output = append(output, host.WorkerNodes[0])
+		output = append(output, nodesMap[host.HostIP])
 		return output, nil, requestClass, requestType, cut
 	}
 
@@ -176,7 +175,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	
 	if allocable {
 		//return findNode(host,nodes), nil, requestClass, requestType,  false
-		output = append(output, host.WorkerNodes[0])
+		output = append(output, nodesMap[host.HostIP])
 		return output, nil, requestClass, requestType,  0.0
 	}
 	fmt.Println("Not allocable")
