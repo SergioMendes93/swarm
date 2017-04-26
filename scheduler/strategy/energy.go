@@ -217,7 +217,7 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 				fmt.Println("FITS!")
 				fmt.Println("killing ")
 				fmt.Println(killList)
-				killTasks(killList, host.HostIP)
+				 killTasks(killList, host.HostIP)
 				go reschedule(killList)
 				return host, true
 			}
@@ -258,8 +258,8 @@ func killTasks(killList []Task, hostIP string) {
 		memory := strconv.FormatFloat(task.Memory,'f',-1,64)
 
 		//this besides killing the task it will also update the allocated cpu/memory  
-		UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID+"&"+cpu+"&"+memory+"&"+hostIP)
 		UpdateTask("http://"+hostIP+":1234/task/remove/"+task.TaskID)
+		UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID+"&"+cpu+"&"+memory+"&"+hostIP)
 	}
 }
 
