@@ -195,7 +195,7 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/class4")...)
 
 		} else if requestClass == "4" { //not worth killing a service for a service
-			break //try next host
+			continue //try next host
 		} else {
 			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/higher/" + requestClass)...)
 		}
