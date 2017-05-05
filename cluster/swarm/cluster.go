@@ -265,7 +265,6 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		go SendInfoTask(container.ID, requestClass, float64(config.HostConfig.CPUShares), config.Image, float64(config.HostConfig.Memory), requestType, cutReceived, n.IP )
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateclass/"+requestClass+"&"+ n.IP)
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/"+n.IP+"&"+taskCPU+"&"+taskMemory+"&"+container.ID)
-		go SendInfoMonitor(container.ID, n.IP)
 	}
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
@@ -273,23 +272,6 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 	return container, err
 }
-
-//send task ID to monitor so it nows what to monitor
-func SendInfoMonitor(containerID string, hostIP string) {
-	url := "http://"+hostIP+":8080/newtask/?id="+containerID
-	req, err := http.NewRequest("GET", url, nil)
-    req.Header.Set("X-Custom-Header", "myvalue")
-    req.Header.Set("Content-Type", "application/json")
-
-    client := &http.Client{}
-    resp, err := client.Do(req)
-
-    if err != nil {
-        panic(err)
-    }
-    defer resp.Body.Close()
-}
-
 
 
 //used to send updates to task registry
