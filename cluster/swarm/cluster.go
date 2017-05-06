@@ -263,7 +263,6 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 
 		go SendInfoTask(container.ID, requestClass, float64(config.HostConfig.CPUShares), config.Image, float64(config.HostConfig.Memory), requestType, cutReceived, n.IP )
-		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateclass/"+requestClass+"&"+ n.IP)
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/"+n.IP+"&"+taskCPU+"&"+taskMemory+"&"+container.ID)
 	}
 	c.scheduler.Lock()

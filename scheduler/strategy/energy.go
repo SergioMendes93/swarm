@@ -130,6 +130,8 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		}
 	}	
 
+	fmt.Print("Starting algorithm, request = ")
+	fmt.Println(config)
 
 	if err != nil {
 		return nil, err, "0", requestType, 0.0
@@ -152,9 +154,13 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory), hostClassForOverbooking) {
 			//return findNode(host,nodes), nil, requestClass, requestType, false
 			output = append(output, nodesMap[host.HostIP])
+
+			taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
+			taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
+			go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+			SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory+"&0")
 			return output, nil, requestClass, requestType, 0.0
 		}
-			
 	}
 //------------------------ Cut algorithm ------------------------
 
@@ -163,8 +169,16 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 	host, allocable, cut := cut(listHostsLEE_DEE, requestClass, config)
 	if allocable { //if true then it means that we have a host that it can be scheduled	
-		//return findNode(host, nodes), nil, cut, requestType, true
 		output = append(output, nodesMap[host.HostIP])
+
+		if cut != 0.0 {
+			config.HostConfig.CPUShares = int64(float64(config.HostConfig.CPUShares) * cut)
+			config.HostConfig.Memory = int64(float64(config.HostConfig.Memory) *  cut)
+		}
+		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
+		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
+		go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+		SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory+"&0")
 		return output, nil, requestClass, requestType, cut
 	}
 
@@ -175,8 +189,12 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	host, allocable = kill(listHostsEED_DEE, requestClass, requestType, config)
 	
 	if allocable {
-		//return findNode(host,nodes), nil, requestClass, requestType,  false
 		output = append(output, nodesMap[host.HostIP])
+
+		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
+		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
+		go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+		SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory+"&0")
 		return output, nil, requestClass, requestType,  0.0
 	}
 	fmt.Println("Not allocable")
@@ -320,11 +338,11 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		
 		fmt.Println("Attempting to cut at " + host.HostIP)
 
-		//first we check if the request fits on this host without resorting to cuts. This avoid cutting unnecessary tasks
 		hostClassForOverbooking := host.HostClass
 		if requestClass < hostClassForOverbooking {
             hostClassForOverbooking = requestClass
         }
+		//first we check if the request fits on this host without resorting to cuts. This avoid cutting unnecessary tasks
         if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory), hostClassForOverbooking) {
 			return host, true, 0.0
         }
@@ -332,7 +350,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		if host.HostClass >= requestClass && requestClass != "4" {
 			listTasks = append(listTasks, GetTasks("http://"+host.HostIP+":1234/task/highercut/" + requestClass)...)
 		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
-			cutToReceive := amountToCut(requestClass, host.HostClass)
+			cutToReceive := amountToCut(requestClass, hostClassForOverbooking)
 			return host, true, cutToReceive	//cutToReceived indicates the cut to be received by this request, performed at /cluster/swarm/cluster.go
 		} else if requestClass != "1" {
 			listTasks = append(listTasks, GetTasks("http://"+host.HostIP+":1234/task/equalhigher/" + requestClass+"&"+host.HostClass)...)
@@ -346,7 +364,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		fmt.Println(listTasks)
 
 		if requestClass != "1" {
-			newMemory,newCPU,canCut = applyCut(requestClass, config, host.HostClass)
+			newMemory,newCPU,canCut = applyCut(requestClass, config, hostClassForOverbooking)
 			if !canCut { //if we cannot cut the request we use the original memory and cpu values
 				newCPU = float64(config.HostConfig.CPUShares)
 				newMemory = float64(config.HostConfig.Memory)				
@@ -366,7 +384,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 				go cutRequests(cutList, host.HostIP)
 				fmt.Println("Cutting these tasks")
 				fmt.Println(cutList)
-				cutToReceive := amountToCut(requestClass, host.HostClass)
+				cutToReceive := amountToCut(requestClass, hostClassForOverbooking)
 				return host, true, cutToReceive
 			}
 		}
@@ -534,16 +552,19 @@ func applyCut(requestClass string, config *cluster.ContainerConfig, hostClass st
 
 func afterCutRequestFits(requestClass string, host *Host, config *cluster.ContainerConfig) (bool) {
 
-	newMemory, newCPU, canCut := applyCut(requestClass, config, host.HostClass)
-	
+	hostClassForOverbooking := host.HostClass
+    if requestClass < hostClassForOverbooking {
+    	hostClassForOverbooking = requestClass
+    }
+
+	newMemory, newCPU, canCut := applyCut(requestClass, config, hostClassForOverbooking)
+	fmt.Print("After cut request fits = ")
+	fmt.Println(canCut)	
+
 	if !canCut {
 		return false
 	}
 
-	hostClassForOverbooking := host.HostClass
-        if requestClass < hostClassForOverbooking {
-        	hostClassForOverbooking = requestClass
-        }
 	return CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, newCPU, newMemory, hostClassForOverbooking)	
 }
 
@@ -586,3 +607,19 @@ func GetHosts(url string) ([]*Host) {
 	return listHosts
 }
 
+
+//used to send updates to host Registry
+func SendInfoHost(url string) {
+
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("Content-Type", "application/json")
+		
+	client := &http.Client{}
+	resp, err := client.Do(req)
+		
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+}
