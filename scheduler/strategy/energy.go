@@ -233,8 +233,8 @@ func reschedule(killList []Task) {
 
 		//we must reschedule with original values (the values can reduced due to cuts)
 		if task.CutReceived > 0.0 {
-			originalCPU = task.CPU / task.CutReceived
-			originalMemory = task.Memory / task.CutReceived
+			originalCPU = task.CPU / (1 - task.CutReceived)
+			originalMemory = task.Memory / (1 - task.CutReceived)
 		} else {
 			originalCPU = task.CPU
 			originalMemory = task.Memory
