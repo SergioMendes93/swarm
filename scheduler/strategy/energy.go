@@ -240,8 +240,8 @@ func reschedule(killList []Task) {
 			originalMemory = task.Memory
 		}
 
-		cpu := strconv.FormatFloat(originalCPU,'f',-1,64)
-		memory := strconv.FormatFloat(originalMemory,'f',-1,64)
+		cpu := strconv.FormatInt(int64(originalCPU),10)
+		memory := strconv.FormatInt(int64(originalMemory),10)
 		go reschedulingTasks(cpu, memory, task.TaskClass, task.Image, task.TaskType)
 	}
 }
