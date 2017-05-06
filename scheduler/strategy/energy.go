@@ -228,9 +228,17 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 
 func reschedule(killList []Task) {
 	for _, task := range killList {
+		originalCPU := 0.0
+		originalMemory := 0.0
+
 		//we must reschedule with original values (the values can reduced due to cuts)
-		originalCPU := task.CPU / task.CutReceived
-		originalMemory := task.Memory / task.CutReceived
+		if task.CutReceived > 0.0 {
+			originalCPU = task.CPU / task.CutReceived
+			originalMemory = task.Memory / task.CutReceived
+		} else {
+			originalCPU = task.CPU
+			originalMemory = task.Memory
+		}
 
 		cpu := strconv.FormatFloat(originalCPU,'f',-1,64)
 		memory := strconv.FormatFloat(originalMemory,'f',-1,64)
