@@ -171,12 +171,15 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	if allocable { //if true then it means that we have a host that it can be scheduled	
 		output = append(output, nodesMap[host.HostIP])
 
+		var cpu int64
+		var memory int64
+		
 		if cut != 0.0 {
-			config.HostConfig.CPUShares = int64(float64(config.HostConfig.CPUShares) * cut)
-			config.HostConfig.Memory = int64(float64(config.HostConfig.Memory) *  cut)
+			cpu = int64(float64(config.HostConfig.CPUShares) * cut)
+			memory = int64(float64(config.HostConfig.Memory) *  cut)
 		}
-		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
-		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
+		taskCPU := strconv.FormatInt(cpu,10)
+		taskMemory := strconv.FormatInt(memory,10)
 		go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
 		SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory+"&0")
 		return output, nil, requestClass, requestType, cut
