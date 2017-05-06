@@ -228,15 +228,19 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 
 func reschedule(killList []Task) {
 	for _, task := range killList {
-		cpu := strconv.FormatFloat(task.CPU,'f',-1,64)
-		memory := strconv.FormatFloat(task.Memory,'f',-1,64)
-		go reschedulingTasks(cpu, memory, task.TaskClass, task.Image)
+		//we must reschedule with original values (the values can reduced due to cuts)
+		originalCPU := task.CPU / task.CutReceived
+		originalMemory := task.Memory / task.CutReceived
+
+		cpu := strconv.FormatFloat(originalCPU,'f',-1,64)
+		memory := strconv.FormatFloat(originalMemory,'f',-1,64)
+		go reschedulingTasks(cpu, memory, task.TaskClass, task.Image, task.TaskType)
 	}
 }
 
-func reschedulingTasks(cpu string, memory string, taskClass string, image string ) {
+func reschedulingTasks(cpu string, memory string, taskClass string, image string, taskType string ) {
 	url := "http://"+ipHostRegistry+":12345/host/reschedule"
-	values := map[string]string{"CPU":cpu, "Memory": memory, "TaskClass":taskClass, "Image":image}
+	values := map[string]string{"CPU":cpu, "Memory": memory, "TaskClass":taskClass, "Image":image, "TaskType":taskType}
 
 	jsonStr, _ := json.Marshal(values)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
