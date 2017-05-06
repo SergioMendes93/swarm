@@ -345,13 +345,17 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		//first we check if the request fits on this host without resorting to cuts. This avoid cutting unnecessary tasks
         if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory), hostClassForOverbooking) {
 			return host, true, 0.0
-        }
+        } 
+		//second we try to fit the request by cutting it 
+		if requestClass != "1" && afterCutRequestFits(requestClass, host, config) {
+			cutToReceive := amountToCut(requestClass, hostClassForOverbooking)
+			return host, true, cutToReceive	//cutToReceived indicates the cut to be received by this request, performed at /cluster/swarm/cluster.go
+		} else if requestClass > host.HostClass{ //otherwise, if requestClass > hostClass we continue to next host, not worth to attempt to cut at this host
+			continue
+		}
 
 		if host.HostClass >= requestClass && requestClass != "4" {
 			listTasks = append(listTasks, GetTasks("http://"+host.HostIP+":1234/task/highercut/" + requestClass)...)
-		} else if requestClass != "1" && afterCutRequestFits(requestClass, host, config){
-			cutToReceive := amountToCut(requestClass, hostClassForOverbooking)
-			return host, true, cutToReceive	//cutToReceived indicates the cut to be received by this request, performed at /cluster/swarm/cluster.go
 		} else if requestClass != "1" {
 			listTasks = append(listTasks, GetTasks("http://"+host.HostIP+":1234/task/equalhigher/" + requestClass+"&"+host.HostClass)...)
 		}
