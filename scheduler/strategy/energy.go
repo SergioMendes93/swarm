@@ -173,12 +173,12 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	if allocable { //if true then it means that we have a host that it can be scheduled	
 		output = append(output, nodesMap[host.HostIP])
 
-		var cpu int64
-		var memory int64
+		cpu := config.HostConfig.CPUShares
+		memory := config.HostConfig.Memory
 		
 		if cut != 0.0 {
-			cpu = int64(float64(config.HostConfig.CPUShares) * cut)
-			memory = int64(float64(config.HostConfig.Memory) *  cut)
+			cpu = int64(float64(cpu) * cut)
+			memory = int64(float64(memory) * cut)
 		}
 		taskCPU := strconv.FormatInt(cpu,10)
 		taskMemory := strconv.FormatInt(memory,10)
