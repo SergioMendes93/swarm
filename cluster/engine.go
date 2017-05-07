@@ -773,6 +773,14 @@ func (e *Engine) refreshContainer(ID string, full bool) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if len(containers) == 0 {
+		// The container doesn't exist on the engine, remove it.
+		e.Lock()
+		delete(e.containers, ID)
+		e.Unlock()
+		return nil, nil
+	}
 	
 	//if these conditions verify then the container has finished and we must alert the task registry that this task no longer exists. It will be alerted via the host registry
 	//because it cannot be performed here.
@@ -796,14 +804,6 @@ func (e *Engine) refreshContainer(ID string, full bool) (*Container, error) {
 		return nil, err
 	}
 
-	if len(containers) == 0 {
-		// The container doesn't exist on the engine, remove it.
-		fmt.Println("AQUI")
-		e.Lock()
-		delete(e.containers, ID)
-		e.Unlock()
-		return nil, nil
-	}
 	_, err = e.updateContainer(containers[0], e.containers, full)
 	e.RLock()
 	container := e.containers[containers[0].ID]
