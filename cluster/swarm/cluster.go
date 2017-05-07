@@ -278,7 +278,8 @@ func SendInfoTask(containerID string, requestClass string, taskCPU float64, imag
 	//Update Task Registry with the task that was just created
 	url := "http://"+hostIP+":1234/task/"+requestClass
 	values := map[string]interface{}{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
-									"Memory": taskMemory, "TaskType": requestType, "CutReceived": cutReceived}  
+									"Memory": taskMemory, "TaskType": requestType, "CutReceived": cutReceived,
+									"OriginalCPU": taskCPU, "OriginalMemory": taskMemory}  
 	jsonStr, _ := json.Marshal(values)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))

@@ -41,6 +41,8 @@ type Task struct {
 	TaskType string         			`json:"tasktype,omitempty"`
     CutReceived float64     			`json:"cutreceived,omitempty"`
 	CutToReceive float64				`json:"cuttoreceive,omitempty"`
+	OriginalCPU                 float64 `json:"originalcpu,omitempty"`
+    OriginalMemory              float64 `json:"originalmemory,omitempty"`
 }
 
 var ipHostRegistry = ""
@@ -249,20 +251,9 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 
 func reschedule(killList []Task) {
 	for _, task := range killList {
-		originalCPU := 0.0
-		originalMemory := 0.0
-
-		//we must reschedule with original values (the values can reduced due to cuts)
-		if task.CutReceived > 0.0 {
-			originalCPU = task.CPU / (1 - task.CutReceived)
-			originalMemory = task.Memory / (1 - task.CutReceived)
-		} else {
-			originalCPU = task.CPU
-			originalMemory = task.Memory
-		}
-
-		cpu := strconv.FormatInt(int64(originalCPU),10)
-		memory := strconv.FormatInt(int64(originalMemory),10)
+		//we must reschedule with original values (the values could be reduced due to cuts)
+		cpu := strconv.FormatInt(int64(task.OriginalCPU),10)
+		memory := strconv.FormatInt(int64(task.OriginalMemory),10)
 		go reschedulingTasks(cpu, memory, task.TaskClass, task.Image, task.TaskType)
 	}
 }
