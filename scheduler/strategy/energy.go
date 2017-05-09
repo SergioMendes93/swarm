@@ -221,8 +221,8 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 		if requestClass == "4" && requestType == "job"{
 			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/class4")...)
 
-		} else if requestClass == "4" { //not worth killing a service for a service
-			continue //try next host
+		} else if requestClass == "4" { //not worth killing a service for a service we break, this is not allocable
+			break 
 		} else {
 			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/higher/" + requestClass)...)
 		}
@@ -243,11 +243,7 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 			cpuReduction += task.CPU 
 			memoryReduction += task.Memory
 			
-			if task.TaskClass == "4" && task.TaskType == "service" {
-				killList = append(killList, task)
-			} else if requestClass != "4" {
-				killList = append(killList, task)
-			}
+			killList = append(killList, task)
 
 			if requestFitsAfterKills(host, config, hostClassForOverbooking, cpuReduction, memoryReduction) {
 				fmt.Println("FITS!")
