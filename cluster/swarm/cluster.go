@@ -262,7 +262,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 
 
-		go SendInfoTask(container.ID, requestClass, float64(config.HostConfig.CPUShares), config.Image, float64(config.HostConfig.Memory), requestType, cutReceived, n.IP )
+		go SendInfoTask(container.ID, requestClass, config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, cutReceived, n.IP )
 		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/"+n.IP+"&"+taskCPU+"&"+taskMemory+"&"+container.ID)
 	}
 	c.scheduler.Lock()
@@ -274,7 +274,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 
 //used to send updates to task registry
-func SendInfoTask(containerID string, requestClass string, taskCPU float64, image string, taskMemory float64, requestType string, cutReceived float64, hostIP string) {
+func SendInfoTask(containerID string, requestClass string, taskCPU int64, image string, taskMemory int64, requestType string, cutReceived float64, hostIP string) {
 	//Update Task Registry with the task that was just created
 	url := "http://"+hostIP+":1234/task/"+requestClass
 	values := map[string]interface{}{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,

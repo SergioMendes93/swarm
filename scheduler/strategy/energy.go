@@ -21,11 +21,11 @@ type Host struct {
     	TotalResourcesUtilization float64      `json:"totalresouces,omitempty"`
     	CPU_Utilization           float64      `json:"cpu,omitempty"`
     	MemoryUtilization         float64      `json:"memory,omitempty"`
-    	AllocatedMemory           float64      `json:"allocatedmemory,omitempty"`
-    	AllocatedCPUs             float64      `json:"allocatedcpus,omitempty"`
+    	AllocatedMemory           int64      `json:"allocatedmemory,omitempty"`
+    	AllocatedCPUs             int64      `json:"allocatedcpus,omitempty"`
     	OverbookingFactor         float64      `json:"overbookingfactor,omitempty"`
-    	TotalMemory               float64      `json:"totalmemory,omitempty"`
-    	TotalCPUs                 float64      `json:"totalcpus, omitempty"`
+    	TotalMemory               int64      `json:"totalmemory,omitempty"`
+    	TotalCPUs                 int64      `json:"totalcpus, omitempty"`
 
 }
 
@@ -33,16 +33,16 @@ type Task struct {
     TaskID string           			`json:"taskid,omitempty"`
 	TaskClass string					`json:"taskclass,omitempty"`
 	Image string						`json:"image,omitempty"`
-	CPU float64							`json:"cpu,omitempty"`
+	CPU int64							`json:"cpu,omitempty"`
 	TotalResourcesUtilization float64	`json:"totalresources,omitempty"`
-	Memory float64						`json:"memory,omitempty"`
+	Memory int64						`json:"memory,omitempty"`
     CPUUtilization float64				`json:"cpuutilization,omitempty"`
 	MemoryUtilization float64			`json:"memoryutilization, omitempty"`
 	TaskType string         			`json:"tasktype,omitempty"`
     CutReceived float64     			`json:"cutreceived,omitempty"`
 	CutToReceive float64				`json:"cuttoreceive,omitempty"`
-	OriginalCPU                 float64 `json:"originalcpu,omitempty"`
-    OriginalMemory              float64 `json:"originalmemory,omitempty"`
+	OriginalCPU                 int64 `json:"originalcpu,omitempty"`
+    OriginalMemory              int64 `json:"originalmemory,omitempty"`
 }
 
 var ipHostRegistry = ""
@@ -72,10 +72,10 @@ func (p *EnergyPlacementStrategy) Name() string {
 }
 //this hostClass can be current class or the future class the host will. Ex: if the incoming request is 3 and the host class is 4, then hostClass must be 3 instead of to 
 //account the new overbooking factor oh the host
-func CheckOverbookingLimit(host *Host, hostAllocatedCPUs float64, hostAllocatedMemory float64, requestCPUs float64, requestMemory float64, hostClass string) bool {
+func CheckOverbookingLimit(host *Host, hostAllocatedCPUs int64, hostAllocatedMemory int64, requestCPUs int64, requestMemory int64, hostClass string) bool {
 	//Lets get the new overbooking factor after the request is allocated  (worst case estimation because we assume that they are going to use all the resources)
-	overbookingMemory := (hostAllocatedMemory + requestMemory)/host.TotalMemory
-	overbookingCPUs := 	(hostAllocatedCPUs + requestCPUs)/host.TotalCPUs
+	overbookingMemory := (float64(hostAllocatedMemory) + float64(requestMemory))/float64(host.TotalMemory)
+	overbookingCPUs := 	(float64(hostAllocatedCPUs) + float64(requestCPUs))/float64(host.TotalCPUs)
 	
 	newOverbooking := math.Max(overbookingMemory,overbookingCPUs)
 	fmt.Print("Current overbooking ")
@@ -122,6 +122,9 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	requestClass := ""
 	requestType := ""
 
+	fmt.Println("affinitnies")
+	fmt.Println(affinities)
+
 	for _, affinity := range affinities {
 		if affinity.Key == "requestclass" {
 			requestClass = affinity.Value
@@ -153,7 +156,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		if requestClass < hostClassForOverbooking {
 			hostClassForOverbooking = requestClass
 		}
-		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory), hostClassForOverbooking) {
+		if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, config.HostConfig.CPUShares, config.HostConfig.Memory, hostClassForOverbooking) {
 			//return findNode(host,nodes), nil, requestClass, requestType, false
 			output = append(output, nodesMap[host.HostIP])
 
@@ -278,8 +281,8 @@ func reschedulingTasks(cpu string, memory string, taskClass string, image string
 
 func killTasks(killList []Task, hostIP string) {
 	for _, task := range killList {
-		cpu := strconv.FormatFloat(task.CPU,'f',-1,64)
-		memory := strconv.FormatFloat(task.Memory,'f',-1,64)
+		cpu := strconv.FormatInt(task.CPU,10)
+		memory := strconv.FormatInt(task.Memory,10)
 
 		//this besides killing the task it will also update the allocated cpu/memory  
 		UpdateTask("http://"+hostIP+":1234/task/remove/"+task.TaskID)
@@ -288,8 +291,8 @@ func killTasks(killList []Task, hostIP string) {
 }
 
 func requestFitsAfterKills(killList []Task, host *Host, config *cluster.ContainerConfig, requestClass string) (bool) {
-	cpuReduction := 0.0
-	memoryReduction := 0.0
+	var cpuReduction int64 = 0
+	var memoryReduction int64 = 0
 
 	fmt.Println("Checking if fits after kills")
 	
@@ -317,7 +320,7 @@ func requestFitsAfterKills(killList []Task, host *Host, config *cluster.Containe
         if requestClass < hostClassForOverbooking {
         	hostClassForOverbooking = requestClass
         }
-	return CheckOverbookingLimit(host, hostCPU, hostMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory), hostClassForOverbooking)	
+	return CheckOverbookingLimit(host, hostCPU, hostMemory, config.HostConfig.CPUShares, config.HostConfig.Memory, hostClassForOverbooking)	
 }
 
 func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool, float64) {
@@ -337,7 +340,7 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
             hostClassForOverbooking = requestClass
         }
 		//first we check if the request fits on this host without resorting to cuts. This avoid cutting unnecessary tasks
-        if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, float64(config.HostConfig.CPUShares), float64(config.HostConfig.Memory), hostClassForOverbooking) {
+        if CheckOverbookingLimit(host, host.AllocatedCPUs, host.AllocatedMemory, config.HostConfig.CPUShares, config.HostConfig.Memory, hostClassForOverbooking) {
 			return host, true, 0.0
         } 
 		//second we try to fit the request by cutting it 
@@ -354,8 +357,8 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 			listTasks = append(listTasks, GetTasks("http://"+host.HostIP+":1234/task/equalhigher/" + requestClass+"&"+host.HostClass)...)
 		}
 		
-		newCPU := 0.0
-		newMemory := 0.0
+		var newCPU int64 = 0
+		var newMemory int64 = 0
 		canCut := false
 		
 		fmt.Println("Task that will be attempted to cut")
@@ -364,12 +367,12 @@ func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.Containe
 		if requestClass != "1" {
 			newMemory,newCPU,canCut = applyCut(requestClass, config, hostClassForOverbooking)
 			if !canCut { //if we cannot cut the request we use the original memory and cpu values
-				newCPU = float64(config.HostConfig.CPUShares)
-				newMemory = float64(config.HostConfig.Memory)				
+				newCPU = config.HostConfig.CPUShares
+				newMemory = config.HostConfig.Memory				
 			}
 		} else { //if its a request class 1
-			newCPU = float64(config.HostConfig.CPUShares)
-			newMemory = float64(config.HostConfig.Memory)
+			newCPU = config.HostConfig.CPUShares
+			newMemory = config.HostConfig.Memory
 		}
 	
 		for _, task := range listTasks {
@@ -394,8 +397,8 @@ func cutRequests(cutList []Task, hostIP string) {
 	for _, task := range cutList {
 		amountToCut := task.CutToReceive
 
-		newCPU := task.CPU * (1 - task.CutToReceive)
-		newMemory := task.Memory * (1 - task.CutToReceive)
+		newCPU := int64(float64(task.CPU) * (1 - task.CutToReceive))
+		newMemory := int64(float64(task.Memory) * (1 - task.CutToReceive))
 
 		//these two will be used to update the amount of allocated cpu and memory for this host at the host registry
 		cpuCutPerform := task.CPU - newCPU 
@@ -405,8 +408,8 @@ func cutRequests(cutList []Task, hostIP string) {
 		memory := strconv.FormatInt(int64(newMemory),10)
 	
 		cut := strconv.FormatFloat(amountToCut, 'f', -1, 64)
-		cpuCutPerformed := strconv.FormatFloat(cpuCutPerform, 'f',-1,64)
-		memoryCutPerformed := strconv.FormatFloat(memoryCutPerform, 'f',-1,64)
+		cpuCutPerformed := strconv.FormatInt(cpuCutPerform, 10)
+		memoryCutPerformed := strconv.FormatInt(memoryCutPerform, 10)
 
 		go UpdateTask("http://"+hostIP+":1234/task/updatetask/"+task.TaskClass+"&"+cpu+"&"+memory+"&"+task.TaskID+"&"+cut)
 		go UpdateTask("http://"+ipHostRegistry+":12345/host/updatetask/"+task.TaskID+"&"+cpu+"&"+memory+"&"+hostIP+"&"+cpuCutPerformed+"&"+memoryCutPerformed)
@@ -431,10 +434,10 @@ func UpdateTask (url string) {
 }
 
 //this function checks if after cutting the tasks and incoming request the request fits on this host
-func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, cutList []Task)(bool) {
+func fitAfterCuts(requestClass string, host *Host, memory int64, cpu int64, cutList []Task)(bool) {
 	
-	cpuReduction := 0.0
-	memoryReduction := 0.0
+	var cpuReduction int64 = 0
+	var memoryReduction int64 = 0
 	
 	for _, task := range cutList {
 
@@ -443,8 +446,8 @@ func fitAfterCuts(requestClass string, host *Host, memory float64, cpu float64, 
 		fmt.Print(" cut to receive ")	
 		fmt.Println(task.CutToReceive)		
 
-		cpuReduction += task.CPU * task.CutToReceive
-		memoryReduction +=  task.Memory * task.CutToReceive
+		cpuReduction += int64(float64(task.CPU) * task.CutToReceive)
+		memoryReduction +=  int64(float64(task.Memory) * task.CutToReceive)
 
 		fmt.Print("CPU reduction " )
 		fmt.Print(cpuReduction)
@@ -502,50 +505,50 @@ func amountToCut(requestClass string, hostClass string) (float64) {
 }
 
 //por enquanto esta float mas depois mudar para int
-func applyCut(requestClass string, config *cluster.ContainerConfig, hostClass string) (float64, float64, bool){
+func applyCut(requestClass string, config *cluster.ContainerConfig, hostClass string) (int64, int64, bool){
 	switch requestClass {
 		case "2":
 			 //Applying cut restrictions
 			if hostClass == "1" {
-				newMemory := float64(config.HostConfig.Memory) * (1 - MAX_CUT_CLASS2)
-				newCPU := float64(config.HostConfig.CPUShares) * (1 - MAX_CUT_CLASS2)
+				newMemory := int64(float64(config.HostConfig.Memory) * (1 - MAX_CUT_CLASS2))
+				newCPU := int64(float64(config.HostConfig.CPUShares) * (1 - MAX_CUT_CLASS2))
 				return newMemory, newCPU, true
 			}else {
-				return 0.0,0.0, false
+				return 0, 0, false
 			}
 		case "3":
 			if hostClass == "1" {
-				newMemory := float64(config.HostConfig.Memory) * (1 - MAX_CUT_CLASS3)
-				newCPU := float64(config.HostConfig.CPUShares) * (1 - MAX_CUT_CLASS3)
+				newMemory := int64(float64(config.HostConfig.Memory) * (1 - MAX_CUT_CLASS3))
+				newCPU := int64(float64(config.HostConfig.CPUShares) * (1 - MAX_CUT_CLASS3))
 				return newMemory, newCPU, true
 			} else if hostClass == "2" {
 				cutItCanReceive := MAX_CUT_CLASS3 - MAX_CUT_CLASS2
-				newMemory := float64(config.HostConfig.Memory) * (1 - cutItCanReceive)
-				newCPU := float64(config.HostConfig.CPUShares) * (1 - cutItCanReceive)
+				newMemory := int64(float64(config.HostConfig.Memory) * (1 - cutItCanReceive))
+				newCPU := int64(float64(config.HostConfig.CPUShares) * (1 - cutItCanReceive))
 				return newMemory, newCPU, true
 			} else {
-				return 0.0,0.0,false
+				return 0, 0, false
 			}
 		case "4":
 			if hostClass == "1" {
-				newMemory := float64(config.HostConfig.Memory) * (1 - MAX_CUT_CLASS4)
-				newCPU := float64(config.HostConfig.CPUShares) * (1 - MAX_CUT_CLASS4)
+				newMemory := int64(float64(config.HostConfig.Memory) * (1 - MAX_CUT_CLASS4))
+				newCPU := int64(float64(config.HostConfig.CPUShares) * (1 - MAX_CUT_CLASS4))
 				return newMemory, newCPU, true
 			} else if hostClass == "2" {
 				cutItCanReceive := MAX_CUT_CLASS4 - MAX_CUT_CLASS2
-				newMemory := float64(config.HostConfig.Memory) * (1 - cutItCanReceive)
-				newCPU := float64(config.HostConfig.CPUShares) * (1 - cutItCanReceive)
+				newMemory := int64(float64(config.HostConfig.Memory) * (1 - cutItCanReceive))
+				newCPU := int64(float64(config.HostConfig.CPUShares) * (1 - cutItCanReceive))
 				return newMemory, newCPU, true
 			} else if hostClass == "3" {
 				cutItCanReceive := MAX_CUT_CLASS4 - MAX_CUT_CLASS3
-				newMemory := float64(config.HostConfig.Memory) * (1 - cutItCanReceive)
-				newCPU := float64(config.HostConfig.CPUShares) * (1 - cutItCanReceive)
+				newMemory := int64(float64(config.HostConfig.Memory) * (1 - cutItCanReceive))
+				newCPU := int64(float64(config.HostConfig.CPUShares) * (1 - cutItCanReceive))
 				return newMemory, newCPU, true
 			} else {
-				return 0.0, 0.0, false
+				return 0, 0, false
 			}
 	}
-	return 0.0,0.0, false
+	return 0,0, false
 }
 
 func afterCutRequestFits(requestClass string, host *Host, config *cluster.ContainerConfig) (bool) {

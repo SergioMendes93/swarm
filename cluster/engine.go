@@ -755,7 +755,7 @@ func (e *Engine) RefreshContainers(full bool) error {
 	return nil
 }
 
-var lastIDSent = ""
+  var lastIDSent map[string]string = make(map[string]string)
 
 // Refresh the status of a container running on the engine. If `full` is true,
 // the container will be inspected.
@@ -782,10 +782,12 @@ func (e *Engine) refreshContainer(ID string, full bool) (*Container, error) {
 		return nil, nil
 	}
 	
+	 _, exists := lastIDSent[ID]	
+
 	//if these conditions verify then the container has finished and we must alert the task registry that this task no longer exists. It will be alerted via the host registry
 	//because it cannot be performed here.
-	if(lastIDSent != ID && containers[0].State == "exited") {
-		lastIDSent = ID
+	if(!exists && containers[0].State == "exited") {
+		lastIDSent[ID] = ID
 		req, err := http.NewRequest("GET", "http://146.193.41.142:12345/host/deletetask/"+ID, nil)
         	req.Header.Set("X-Custom-Header", "myvalue")
         	req.Header.Set("Content-Type", "application/json")
@@ -793,8 +795,8 @@ func (e *Engine) refreshContainer(ID string, full bool) (*Container, error) {
         	client := &http.Client{}
         	resp, err := client.Do(req)
         	if err != nil {
-            		panic(err)
-        	}
+            	panic(err)
+        	} 
         	defer resp.Body.Close()
 	}
 	
