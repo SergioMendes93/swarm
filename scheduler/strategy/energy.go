@@ -186,7 +186,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		taskCPU := strconv.FormatInt(cpu,10)
 		taskMemory := strconv.FormatInt(memory,10)
 		go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
-		SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory+"&0")
+		SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
 		return output, nil, requestClass, requestType, cut
 	}
 
@@ -202,7 +202,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
 		go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
-		SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory+"&0")
+		SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
 		return output, nil, requestClass, requestType,  0.0
 	}
 	fmt.Println("Not allocable")
