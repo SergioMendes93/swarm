@@ -788,7 +788,13 @@ func (e *Engine) refreshContainer(ID string, full bool) (*Container, error) {
 	//because it cannot be performed here.
 	if(!exists && containers[0].State == "exited") {
 		lastIDSent[ID] = ID
-		req, err := http.NewRequest("GET", "http://146.193.41.142:12345/host/deletetask/"+ID, nil)
+		
+		hostInfo := strings.Split(e.IP,":")
+		hostIP := hostInfo[0]		
+		
+		//to task registry to be removed
+		fmt.Println("CONTAINER EXITED, sending to " + hostIP)
+		req, err := http.NewRequest("GET", "http://"+hostIP+":1234/task/remove/"+ID, nil)
         	req.Header.Set("X-Custom-Header", "myvalue")
         	req.Header.Set("Content-Type", "application/json")
 
