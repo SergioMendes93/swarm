@@ -12,7 +12,7 @@ import (
 	"time"
 	"net/http"
 	"bytes"
-	"strconv"
+//	"strconv"
 	"net"
 	"encoding/json"
 
@@ -244,7 +244,6 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 				cutReceived = 1 - cut
 		}
 	}
-
 	container, err := engine.CreateContainer(config, name, true, authConfig)
 
 	if err != nil {
@@ -258,12 +257,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	}
 
 	if strategy == "energy"{	
-		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
-		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
-
-
 		go SendInfoTask(container.ID, requestClass, config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, cutReceived, n.IP )
-		go SendInfoHost("http://"+getIPAddress()+":12345/host/updateresources/"+n.IP+"&"+taskCPU+"&"+taskMemory+"&"+container.ID)
 	}
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
