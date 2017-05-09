@@ -313,12 +313,8 @@ func reschedulingTasks(cpu string, memory string, taskClass string, image string
 
 func killTasks(killList []Task, hostIP string) {
 	for _, task := range killList {
-		cpu := strconv.FormatInt(task.CPU,10)
-		memory := strconv.FormatInt(task.Memory,10)
-
 		//this besides killing the task it will also update the allocated cpu/memory  
 		UpdateTask("http://"+hostIP+":1234/task/remove/"+task.TaskID)
-		UpdateTask("http://"+ipHostRegistry+":12345/host/killtask/"+task.TaskID+"&"+cpu+"&"+memory+"&"+hostIP)
 	}
 }
 
