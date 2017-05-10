@@ -793,7 +793,6 @@ func (e *Engine) refreshContainer(ID string, full bool) (*Container, error) {
 		hostIP := hostInfo[0]		
 		
 		//to task registry to be removed
-		fmt.Println("CONTAINER EXITED, sending to " + hostIP)
 		req, err := http.NewRequest("GET", "http://"+hostIP+":1234/task/remove/"+ID, nil)
         	req.Header.Set("X-Custom-Header", "myvalue")
         	req.Header.Set("Content-Type", "application/json")
@@ -1361,7 +1360,6 @@ func (e *Engine) addImage(image *Image) {
 func (e *Engine) removeContainer(container *Container) error {
 	e.Lock()
 	defer e.Unlock()
-	fmt.Println("Container exiting")
 
 	if _, ok := e.containers[container.ID]; !ok {
 		return errors.New("container not found")
