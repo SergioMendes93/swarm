@@ -1004,6 +1004,10 @@ func (e *Engine) CreateContainer(config *ContainerConfig, name string, pullImage
 	// FIXME remove "duplicate" lines and move this to cluster/config.go
 	dockerConfig.HostConfig.CPUShares = int64(math.Ceil(float64(config.HostConfig.CPUShares) / float64(e.Cpus)))
 
+	if dockerConfig.HostConfig.CPUShares == 1 {
+		dockerConfig.HostConfig.CPUShares = 2
+	}	
+
 	createResp, err = e.apiClient.ContainerCreate(context.Background(), &dockerConfig.Config, &dockerConfig.HostConfig, &dockerConfig.NetworkingConfig, name)
 	e.CheckConnectionErr(err)
 	if err != nil {
