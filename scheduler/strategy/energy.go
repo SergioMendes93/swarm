@@ -191,19 +191,25 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	}
 
 //-------------------------Kill algorithm ----------------------------
-
-	listHostsEED_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/listkill/"+requestClass)
-
-	host, allocable = kill(listHostsEED_DEE, requestClass, requestType, config)
 	
-	if allocable {
-		output = append(output, nodesMap[host.HostIP])
+	//if a class 4 service reaches this point then its not allocable. It is not worth killing a class 4 service for another class4 service or a class 4 job
+	if requestClass == "4" && requestType == "service" { 
+		fmt.Println("Class 4 service not allocable Not allocable")
+		return nil, errors.New("Does not fit on current hosts"), requestClass, requestType, 0.0 //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
+	} else {
+		listHostsEED_DEE := GetHosts("http://"+ipHostRegistry+":12345/host/listkill/"+requestClass)
 
-		taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
-		taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
-		go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
-		SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
-		return output, nil, requestClass, requestType,  0.0
+		host, allocable = kill(listHostsEED_DEE, requestClass, requestType, config)
+	
+		if allocable {
+			output = append(output, nodesMap[host.HostIP])
+
+			taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
+			taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
+			go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+			SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
+			return output, nil, requestClass, requestType,  0.0
+		}
 	}
 	fmt.Println("Not allocable")
 	return nil, errors.New("Does not fit on current hosts"), requestClass, requestType, 0.0 //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
@@ -218,13 +224,10 @@ func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, con
 		host := listHostsEED_DEE[i] 
 		fmt.Println("Attempting to kill at host " + host.HostIP)
 
-		if requestClass == "4" && requestType == "job"{
-			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/class4")...)
-
-		} else if requestClass == "4" { //not worth killing a service for a service we break, this is not allocable
-			break 
-		} else {
+		if requestClass != "4" {
 			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/higher/" + requestClass)...)
+		} else { //its a class 4 with type = job
+			possibleKillList = append(possibleKillList, GetTasks("http://"+host.HostIP+":1234/task/class4")...)
 		}
 
 		fmt.Println("Possible kill list")
@@ -316,7 +319,6 @@ func killTasks(killList []Task, hostIP string) {
 
 
 func cut(listHostsLEE_DEE []*Host, requestClass string, config *cluster.ContainerConfig) (*Host, bool, float64) {
-		
 	fmt.Println("Cut algorithm")
 
 	for i := 0; i < len(listHostsLEE_DEE); i++ {
@@ -542,16 +544,16 @@ func afterCutRequestFits(requestClass string, host *Host, config *cluster.Contai
 
 func GetTasks(url string) ([]Task) {
 	req, err := http.NewRequest("GET", url, nil)
-  
+	
 	req.Header.Set("X-Custom-Header", "myvalue")
 	req.Header.Set("Content-Type", "application/json")
 
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        panic(err)
-    }
-    defer resp.Body.Close()
+    	client := &http.Client{}
+    	resp, err := client.Do(req)
+    	if err != nil {
+        	panic(err)
+    	}
+    	defer resp.Body.Close()
 
 	var listTasks []Task 
 	_ = json.NewDecoder(resp.Body).Decode(&listTasks)	
@@ -566,23 +568,21 @@ func GetHosts(url string) ([]*Host) {
 	req.Header.Set("X-Custom-Header", "myvalue")
 	req.Header.Set("Content-Type", "application/json")
 
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        panic(err)
-    }
-    defer resp.Body.Close()
+    	client := &http.Client{}
+    	resp, err := client.Do(req)
+    	if err != nil {
+        	panic(err)
+    	}
+    	defer resp.Body.Close()
 
 	var listHosts []*Host 
 	_ = json.NewDecoder(resp.Body).Decode(&listHosts)	
-	
 	return listHosts
 }
 
 
 //used to send updates to host Registry
 func SendInfoHost(url string) {
-
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("X-Custom-Header", "myvalue")
 	req.Header.Set("Content-Type", "application/json")
