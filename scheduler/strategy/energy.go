@@ -116,6 +116,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	affinities, err := filter.ParseExprs(config.Affinities())
 	requestClass := ""
 	requestType := ""
+	rescheduled := "no" //used to identify if a task is being rescheduled or not
 
 	for _, affinity := range affinities {
 		if affinity.Key == "requestclass" {
@@ -124,6 +125,10 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		}
 		if affinity.Key == "requesttype" {
 			requestType = affinity.Value
+			continue
+		}
+		if affinity.Key == "rescheduled" {
+			rescheduled = "yes"
 		}
 	}	
 	if err != nil {
@@ -198,9 +203,34 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 			return output, nil, requestClass, requestType,  0.0
 		}
 	}
+
+	//if this task is being is rescheduled, we cannot let it not be allocated. So we rescheduled it using a lower class(increasing the scheduling priority of the class)
+	// than its current	
+	if rescheduled == "yes" {
+		go increasePriority(requestClass, requestType, config)	
+	}
 	return nil, errors.New("Does not fit on current hosts"), requestClass, requestType, 0.0 //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
 }
 
+func increasePriority(requestClass string, requestType string, config *cluster.ContainerConfig) {
+	cpu := strconv.FormatInt(config.HostConfig.CPUShares,10)
+	memory := strconv.FormatInt(config.HostConfig.Memory,10)
+
+	switch requestClass {
+		//if it cant be scheduled being a class 1, then it cannot be rescheduled
+		case "1":
+			return
+		case "2":
+			go reschedulingTasks(cpu, memory, "1", config.Image, requestType)
+			break
+		case "3":
+			go reschedulingTasks(cpu, memory, "2", config.Image, requestType)
+			break
+		case "4":
+			go reschedulingTasks(cpu, memory, "3", config.Image, requestType)
+			break
+	}
+}
 
 func kill(listHostsEED_DEE []*Host, requestClass string, requestType string, config *cluster.ContainerConfig) (*Host, bool) {
 	for i := 0 ; i < len(listHostsEED_DEE); i++ {

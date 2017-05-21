@@ -170,11 +170,11 @@ func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, 
 				retries++
 			}
 		}
-
+		/*
 		for ; retries < c.createRetry && err != nil; retries++ {
 			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
 			container, err = c.createContainer(config, name, false, authConfig)
-		}
+		}*/
 	}
 	return container, err
 }
