@@ -16,6 +16,7 @@ import (
 	"net"
 	"encoding/json"
 
+	"github.com/docker/swarm/scheduler/filter"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	containertypes "github.com/docker/docker/api/types/container"
@@ -236,7 +237,17 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 
 	strategy := c.scheduler.Strategy()
+	makespan := ""
+
 	if strategy == "energy" {
+		affinities, _ := filter.ParseExprs(config.Affinities())
+		for _, affinity := range affinities {
+			if affinity.Key == "makespan" {
+				makespan = affinity.Value
+				break
+			}
+		} 		
+
 		//if this condition is true then we must apply a cut to the request in order to fit it 
 		if cut != 0.0 {
 				config.HostConfig.CPUShares = int64(float64(config.HostConfig.CPUShares) * cut)
@@ -257,7 +268,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	}
 
 	if strategy == "energy"{	
-		go SendInfoTask(container.ID, requestClass, config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, cutReceived, n.IP )
+		go SendInfoTask(container.ID, requestClass, config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, cutReceived, n.IP, makespan)
 	}
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
@@ -268,9 +279,9 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 
 //used to send updates to task registry
-func SendInfoTask(containerID string, requestClass string, taskCPU int64, image string, taskMemory int64, requestType string, cutReceived float64, hostIP string) {
+func SendInfoTask(containerID string, requestClass string, taskCPU int64, image string, taskMemory int64, requestType string, cutReceived float64, hostIP string, makespan string) {
 	//Update Task Registry with the task that was just created
-	url := "http://"+hostIP+":1234/task/"+requestClass
+	url := "http://"+hostIP+":1234/task/"+requestClass+"&"+makespan
 	values := map[string]interface{}{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
 									"Memory": taskMemory, "TaskType": requestType, "CutReceived": cutReceived,
 									"OriginalCPU": taskCPU, "OriginalMemory": taskMemory}  
