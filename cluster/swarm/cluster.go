@@ -1113,7 +1113,7 @@ func getIPAddress() string {
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil{
-				return "146.193.41.142"
+				return "10.5.60.2"
 				//return ipnet.IP.String()
 			}
 		}

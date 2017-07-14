@@ -44,7 +44,7 @@ type Task struct {
         OriginalMemory              int64 	`json:"originalmemory,omitempty"`
 }
 
-var ipHostRegistry = ""
+var ipHostRegistry = "10.5.60.2"
 //var ipAddress = getIPAddress()
 
 var MAX_OVERBOOKING_CLASS1 = 1.0
@@ -109,8 +109,6 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 //	ipHostRegistry = getIPAddress()
 
-	ipHostRegistry = "146.193.41.142"
-
 	output := make([]*node.Node,0)
 
 	affinities, err := filter.ParseExprs(config.Affinities())
@@ -155,8 +153,8 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 			taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 			taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
-			go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
-			SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
+			go SendInfoHost("http://ipHostRegistry:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+			SendInfoHost("http://ipHostRegistry:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
 			return output, nil, requestClass, requestType, 0.0
 		}
 	}
@@ -178,8 +176,8 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		}
 		taskCPU := strconv.FormatInt(cpu,10)
 		taskMemory := strconv.FormatInt(memory,10)
-		go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
-		SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
+		go SendInfoHost("http://ipHostRegistry:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+		SendInfoHost("http://ipHostRegistry:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
 		return output, nil, requestClass, requestType, cut
 	}
 
@@ -198,8 +196,8 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 			taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 			taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
-			go SendInfoHost("http://146.193.41.142:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
-			SendInfoHost("http://146.193.41.142:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
+			go SendInfoHost("http://ipHostRegistry:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+			SendInfoHost("http://ipHostRegistry:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
 			return output, nil, requestClass, requestType,  0.0
 		}
 	}
