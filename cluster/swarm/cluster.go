@@ -239,13 +239,15 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 
 	makespan := "0"
-
+	portNumber := "0"
 	if strategy == "energy" {
 		affinities, _ := filter.ParseExprs(config.Affinities())
 		for _, affinity := range affinities {
 			if affinity.Key == "makespan" {
 				makespan = affinity.Value
-				break
+				continue
+			} else if affinity.Key == "port" {
+				portNumber = affinity.Value
 			}
 		} 		
 
@@ -269,7 +271,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	}
 
 	if strategy == "energy"{	
-		go SendInfoTask(container.ID, requestClass, config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, cutReceived, n.IP, makespan)
+		go SendInfoTask(container.ID, requestClass, config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, cutReceived, n.IP, makespan, portNumber)
 	}
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
@@ -281,10 +283,9 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 
 //used to send updates to task registry
-func SendInfoTask(containerID string, requestClass string, taskCPU int64, image string, taskMemory int64, requestType string, cutReceived float64, hostIP string, makespan string) {
+func SendInfoTask(containerID string, requestClass string, taskCPU int64, image string, taskMemory int64, requestType string, cutReceived float64, hostIP string, makespan string, portNumber string) {
 	//Update Task Registry with the task that was just created
-	fmt.Println("hostIP: " + hostIP)
-	url := "http://"+hostIP+":1234/task/"+requestClass+"&"+makespan
+	url := "http://"+hostIP+":1234/task/"+requestClass+"&"+makespan + "&" +portNumber
 	values := map[string]interface{}{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
 									"Memory": taskMemory, "TaskType": requestType, "CutReceived": cutReceived,
 									"OriginalCPU": taskCPU, "OriginalMemory": taskMemory}  
@@ -301,7 +302,6 @@ func SendInfoTask(containerID string, requestClass string, taskCPU int64, image 
 		panic(err)
 	}
 	defer resp.Body.Close()
-
 }
 
 //used to send updates to host Registry
