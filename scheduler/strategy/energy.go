@@ -114,7 +114,7 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	affinities, err := filter.ParseExprs(config.Affinities())
 	requestClass := ""
 	requestType := ""
-	rescheduled := "no" //used to identify if a task is being rescheduled or not
+	//rescheduled := "no" //used to identify if a task is being rescheduled or not
 
 	for _, affinity := range affinities {
 		if affinity.Key == "requestclass" {
@@ -125,9 +125,9 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 			requestType = affinity.Value
 			continue
 		}
-		if affinity.Key == "rescheduled" {
+		/*if affinity.Key == "rescheduled" {
 			rescheduled = "yes"
-		}
+		}*/
 	}	
 	if err != nil {
 		return nil, err, "0", requestType, 0.0
@@ -153,8 +153,8 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 			taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 			taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
-			go SendInfoHost("http://ipHostRegistry:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
-			SendInfoHost("http://ipHostRegistry:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
+			go SendInfoHost("http://"+ipHostRegistry+":12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+			SendInfoHost("http://"+ipHostRegistry+":12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
 			return output, nil, requestClass, requestType, 0.0
 		}
 	}
@@ -176,8 +176,8 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 		}
 		taskCPU := strconv.FormatInt(cpu,10)
 		taskMemory := strconv.FormatInt(memory,10)
-		go SendInfoHost("http://ipHostRegistry:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
-		SendInfoHost("http://ipHostRegistry:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
+		go SendInfoHost("http://"+ipHostRegistry+":12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+		SendInfoHost("http://"+ipHostRegistry+":12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
 		return output, nil, requestClass, requestType, cut
 	}
 
@@ -196,17 +196,17 @@ func (p *EnergyPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 
 			taskCPU := strconv.FormatInt(config.HostConfig.CPUShares,10)
 			taskMemory := strconv.FormatInt(config.HostConfig.Memory,10)
-			go SendInfoHost("http://ipHostRegistry:12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
-			SendInfoHost("http://ipHostRegistry:12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
+			go SendInfoHost("http://"+ipHostRegistry+":12345/host/updateclass/"+requestClass+"&"+ host.HostIP)
+			SendInfoHost("http://"+ipHostRegistry+":12345/host/updateresources/"+host.HostIP+"&"+taskCPU+"&"+taskMemory)
 			return output, nil, requestClass, requestType,  0.0
 		}
 	}
 
-	//if this task is being is rescheduled, we cannot let it not be allocated. So we rescheduled it using a lower class(increasing the scheduling priority of the class)
+	/*//if this task is being is rescheduled, we cannot let it not be allocated. So we rescheduled it using a lower class(increasing the scheduling priority of the class)
 	// than its current	
 	if rescheduled == "yes" {
 		go increasePriority(requestClass, requestType, config)	
-	}
+	}*/
 	return nil, errors.New("Does not fit on current hosts"), requestClass, requestType, 0.0 //can't be scheduled É PARA FICAR ESTE QUANDO FOR DEFINITIVO
 }
 

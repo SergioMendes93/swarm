@@ -237,7 +237,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 
 	strategy := c.scheduler.Strategy()
-	makespan := ""
+	makespan := "0"
 
 	if strategy == "energy" {
 		affinities, _ := filter.ParseExprs(config.Affinities())
@@ -281,6 +281,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 //used to send updates to task registry
 func SendInfoTask(containerID string, requestClass string, taskCPU int64, image string, taskMemory int64, requestType string, cutReceived float64, hostIP string, makespan string) {
 	//Update Task Registry with the task that was just created
+	fmt.Println("hostIP: " + hostIP)
 	url := "http://"+hostIP+":1234/task/"+requestClass+"&"+makespan
 	values := map[string]interface{}{"TaskID":containerID, "TaskClass":requestClass,"CPU": taskCPU, "Image": image,
 									"Memory": taskMemory, "TaskType": requestType, "CutReceived": cutReceived,
