@@ -15,7 +15,6 @@ import (
 //	"strconv"
 	"net"
 	"encoding/json"
-	"os"
 
 	"github.com/docker/swarm/scheduler/filter"
 	log "github.com/Sirupsen/logrus"
@@ -181,30 +180,6 @@ func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, 
 	return container, err
 }
 
-//collects info about containers allocation: typeAllocation == 1 -> failed allocation, 2 -> successful allocation
-func gatherData(strategy string, typeAllocation int ) {
-	if typeAllocation == 1 {
-		fileFailed, err1 := os.OpenFile(strategy+"FailedAllocation.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-		if err1 != nil {
- 	      		panic(err1)
-		}
-		defer fileFailed.Close()
-		
-		if _, err1 = fileFailed.WriteString("1\n"); err1 != nil {
-      			panic(err1)
-		}
-	} else { //if allocation successful
-		fileFailed, err1 := os.OpenFile(strategy+"SuccessfulAllocation.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-		if err1 != nil {
- 	      		panic(err1)
-		}
-		defer fileFailed.Close()
-		
-		if _, err1 = fileFailed.WriteString("1\n"); err1 != nil {
-      			panic(err1)
-		}
-	}
-}
 
 func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, withImageAffinity bool, authConfig *types.AuthConfig) (*cluster.Container, error) {
 	c.scheduler.Lock()
@@ -244,7 +219,6 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 	if err != nil {
 		c.scheduler.Unlock()
-		go gatherData(strategy, 1) //collect info: this counts containers that failed allocation
 		return nil, err
 	}
 	n := nodes[0]
@@ -301,7 +275,6 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	delete(c.pendingContainers, swarmID)
 	c.scheduler.Unlock()
 
-	gatherData(strategy, 2)
 
 	return container, err
 }
