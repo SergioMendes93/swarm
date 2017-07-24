@@ -240,17 +240,18 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 	makespan := "0"
 	portNumber := "0"
-	if strategy == "energy" {
-		affinities, _ := filter.ParseExprs(config.Affinities())
-		for _, affinity := range affinities {
-			if affinity.Key == "makespan" {
-				makespan = affinity.Value
-				continue
-			} else if affinity.Key == "port" {
-				portNumber = affinity.Value
-			}
-		} 		
 
+	affinities, _ := filter.ParseExprs(config.Affinities())
+	for _, affinity := range affinities {
+		if affinity.Key == "makespan" {
+			makespan = affinity.Value
+			continue
+		} else if affinity.Key == "port" {
+			portNumber = affinity.Value
+		}
+	} 		
+
+	if strategy == "energy" {
 		//if this condition is true then we must apply a cut to the request in order to fit it 
 		if cut != 0.0 {
 				config.HostConfig.CPUShares = int64(float64(config.HostConfig.CPUShares) * cut)
