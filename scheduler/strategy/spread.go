@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"sort"
+	"strconv"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
@@ -36,5 +37,11 @@ func (p *SpreadPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	for i, n := range weightedNodes {
 		output[i] = n.Node
 	}
+
+	cpu := strconv.FormatInt(config.HostConfig.CPUShares, 10) 
+        memory := strconv.FormatInt(config.HostConfig.Memory, 10) 
+
+        SendInfoHost("http://10.5.60.2:12345/host/updateresources/"+output[0].IP+"&"+cpu+"&"+memory)
+
 	return output, nil, "0", "", 0.0
 }
