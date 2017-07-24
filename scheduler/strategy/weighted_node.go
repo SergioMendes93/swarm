@@ -3,6 +3,7 @@ package strategy
 import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
+	"fmt"
 )
 
 
@@ -41,10 +42,10 @@ func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthiness
 	weightedNodes := weightedNodeList{}
 	
 	hosts := GetHosts("http://"+ipHostRegistry+":12345/host/list")		
-
-	for _, host := range hosts {
-		nodeMemory := host.TotalMemory
-		nodeCpus := host.TotalCPUs 
+/*
+	for _, node := range nodes {
+		nodeMemory := node.TotalMemory
+		nodeCpus := node.TotalCpus * 1024 
 
 		// Skip nodes that are smaller than the requested resources.
 		if nodeMemory < int64(config.HostConfig.Memory) || nodeCpus < config.HostConfig.CPUShares {
@@ -57,18 +58,50 @@ func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthiness
 		)
 
 		if config.HostConfig.CPUShares > 0 {
-			cpuScore = (host.AllocatedCPUs + config.HostConfig.CPUShares) * 100 / nodeCpus
+			fmt.Println("Allocated CPUs " + hosts[node.IP].AllocatedCPUs)
+			cpuScore = (hosts[node.IP].AllocatedCPUs + config.HostConfig.CPUShares) * 100 / nodeCpus
 		}
 		if config.HostConfig.Memory > 0 {
-			memoryScore = (host.AllocatedMemory + config.HostConfig.Memory) * 100 / nodeMemory
+			memoryScore = (node.UsedMemory + config.HostConfig.Memory) * 100 / nodeMemory
 		}
 
 		if cpuScore <= 100 && memoryScore <= 100 {
-			output := make([]*node.Node,0)
-			output = append(output, nodesMap[host.HostIP])
-			weightedNodes = append(weightedNodes, &weightedNode{Node: output[0], Weight: cpuScore + memoryScore + healthinessFactor*output[0].HealthIndicator})
+			weightedNodes = append(weightedNodes, &weightedNode{Node: node, Weight: cpuScore + memoryScore + healthinessFactor*node.HealthIndicator})
 		}
-	}
+	}*/
+		for _, host := range hosts {
+			nodeMemory := host.TotalMemory
+			nodeCpus := host.TotalCPUs 
+
+			// Skip nodes that are smaller than the requested resources.
+			if nodeMemory < int64(config.HostConfig.Memory) || nodeCpus < config.HostConfig.CPUShares {
+				continue
+			}
+
+			var (
+				cpuScore    int64 = 100
+				memoryScore int64 = 100
+			)
+
+			if config.HostConfig.CPUShares > 0 {
+				fmt.Print("Allocated CPUs ") 
+				fmt.Println(host.AllocatedCPUs)
+
+				cpuScore = (host.AllocatedCPUs + config.HostConfig.CPUShares) * 100 / nodeCpus
+			}
+			if config.HostConfig.Memory > 0 {
+				fmt.Print("Allocated Memorys ") 
+				fmt.Println(host.AllocatedMemory)
+
+				memoryScore = (host.AllocatedMemory + config.HostConfig.Memory) * 100 / nodeMemory
+			}
+
+			if cpuScore <= 100 && memoryScore <= 100 {
+				output := make([]*node.Node,0)
+				output = append(output, nodesMap[host.HostIP])
+				weightedNodes = append(weightedNodes, &weightedNode{Node: output[0], Weight: cpuScore + memoryScore + healthinessFactor*output[0].HealthIndicator})
+			}
+		}
 
 	if len(weightedNodes) == 0 {
 		return nil, ErrNoResourcesAvailable
