@@ -52,14 +52,14 @@ func (s *Scheduler) selectNodesForContainer(nodes []*node.Node, nodesMap map[str
 	accepted, err := filter.ApplyFilters(s.filters, config, nodes, soft)
 
 	if err != nil {
-		return nil, err,"0", "", 0.0
+		//return nil, err,"0", "", 0.0
 	}
 
 	if len(accepted) == 0 {
-		return nil, errNoNodeAvailable, "0", "", 0.0
+		//return nil, errNoNodeAvailable, "0", "", 0.0
 	}
 
-	return s.strategy.RankAndSort(config, accepted, nodesMap)
+	return s.strategy.RankAndSort(config, nodes, nodesMap)
 }
 
 // Strategy returns the strategy name

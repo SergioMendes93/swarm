@@ -273,7 +273,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	if strategy == "energy"{	
 		go SendInfoTask(container.ID, requestClass, config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, cutReceived, n.IP, makespan, portNumber)
 	} else {
-		go SendInfoTask(container.ID, "0", config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, 0.0, n.IP, makespan, portNumber)
+		go SendInfoTask(container.ID, "0", config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, "0", 0.0, n.IP, makespan, portNumber)
 	}
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
