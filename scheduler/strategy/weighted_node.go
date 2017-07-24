@@ -5,6 +5,7 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
+
 // WeightedNode represents a node in the cluster with a given weight, typically used for sorting
 // purposes.
 type weightedNode struct {
@@ -36,12 +37,14 @@ func (n weightedNodeList) Less(i, j int) bool {
 	return ip.Weight < jp.Weight
 }
 
-func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthinessFactor int64) (weightedNodeList, error) {
+func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthinessFactor int64, nodesMap map[string]*node.Node) (weightedNodeList, error) {
 	weightedNodes := weightedNodeList{}
+	
+	hosts := GetHosts("http://"+ipHostRegistry+":12345/host/list")		
 
-	for _, node := range nodes {
-		nodeMemory := node.TotalMemory
-		nodeCpus := node.TotalCpus
+	for _, host := range hosts {
+		nodeMemory := host.TotalMemory
+		nodeCpus := host.TotalCPUs 
 
 		// Skip nodes that are smaller than the requested resources.
 		if nodeMemory < int64(config.HostConfig.Memory) || nodeCpus < config.HostConfig.CPUShares {
@@ -54,14 +57,16 @@ func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthiness
 		)
 
 		if config.HostConfig.CPUShares > 0 {
-			cpuScore = (node.UsedCpus + config.HostConfig.CPUShares) * 100 / nodeCpus
+			cpuScore = (host.AllocatedCPUs + config.HostConfig.CPUShares) * 100 / nodeCpus
 		}
 		if config.HostConfig.Memory > 0 {
-			memoryScore = (node.UsedMemory + config.HostConfig.Memory) * 100 / nodeMemory
+			memoryScore = (host.AllocatedMemory + config.HostConfig.Memory) * 100 / nodeMemory
 		}
 
 		if cpuScore <= 100 && memoryScore <= 100 {
-			weightedNodes = append(weightedNodes, &weightedNode{Node: node, Weight: cpuScore + memoryScore + healthinessFactor*node.HealthIndicator})
+			output := make([]*node.Node,0)
+			output = append(output, nodesMap[host.HostIP])
+			weightedNodes = append(weightedNodes, &weightedNode{Node: output[0], Weight: cpuScore + memoryScore + healthinessFactor*output[0].HealthIndicator})
 		}
 	}
 
