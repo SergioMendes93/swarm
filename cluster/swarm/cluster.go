@@ -271,9 +271,9 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).Debugf("Scheduling container %s to ", containerFlag)
 	}
 
-	if strategy == "energy"{	
+	if strategy == "energy" && err == nil{	
 		go SendInfoTask(container.ID, requestClass, config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, cutReceived, n.IP, makespan, portNumber)
-	} else {
+	} else if err == nil {
 		go SendInfoTask(container.ID, "0", config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, "0", 0.0, n.IP, makespan, portNumber)
 	}
 	c.scheduler.Lock()
