@@ -240,7 +240,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 	makespan := "0"
 	portNumber := "0"
-
+	typeRequest := "a"
+	
 	affinities, _ := filter.ParseExprs(config.Affinities())
 	for _, affinity := range affinities {
 		if affinity.Key == "makespan" {
@@ -248,6 +249,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 			continue
 		} else if affinity.Key == "port" {
 			portNumber = affinity.Value
+		} else if affinity.Key == "requesttype" {
+			typeRequest = affinity.Value
 		}
 	} 		
 
@@ -274,7 +277,7 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 	if strategy == "energy" && err == nil{	
 		go SendInfoTask(container.ID, requestClass, config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, requestType, cutReceived, n.IP, makespan, portNumber)
 	} else if err == nil {
-		go SendInfoTask(container.ID, "0", config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, "0", 0.0, n.IP, makespan, portNumber)
+		go SendInfoTask(container.ID, "0", config.HostConfig.CPUShares, config.Image, config.HostConfig.Memory, typeRequest, 0.0, n.IP, makespan, portNumber)
 	}
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
