@@ -234,7 +234,6 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		Engine: engine,
 	}
 
-	c.scheduler.Unlock()
 	cutReceived := 0.0
 
 
@@ -262,6 +261,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 				cutReceived = 1 - cut
 		}
 	}
+	c.scheduler.Unlock()
+
 	container, err := engine.CreateContainer(config, name, true, authConfig)
 
 	if err != nil {
